@@ -13,7 +13,9 @@ import {
   Loader2, 
   Clock,
   Zap,
-  AlertTriangle
+  AlertTriangle,
+  Play,
+  Trophy
 } from 'lucide-react';
 
 interface ApiSubmissionFormProps {
@@ -31,6 +33,19 @@ interface TestResult {
   error?: string;
 }
 
+interface EvaluationScores {
+  accuracy_score: number;
+  latency_score: number;
+  stability_score: number;
+  penalty_points: number;
+  total_score: number;
+  details: {
+    tests_passed: number;
+    tests_failed: number;
+    avg_latency_ms: number;
+  };
+}
+
 export function ApiSubmissionForm({ 
   teamId, 
   eventId, 
@@ -41,7 +56,9 @@ export function ApiSubmissionForm({
   const [endpoint, setEndpoint] = useState(currentEndpoint);
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [evaluating, setEvaluating] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
+  const [evaluationScores, setEvaluationScores] = useState<EvaluationScores | null>(null);
   const { toast } = useToast();
 
   const validateEndpoint = (url: string): boolean => {
@@ -203,6 +220,51 @@ export function ApiSubmissionForm({
     }
   };
 
+  const handleEvaluate = async () => {
+    if (!validateEndpoint(endpoint)) {
+      toast({
+        title: 'Invalid URL',
+        description: 'Please enter a valid API endpoint URL',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setEvaluating(true);
+    setEvaluationScores(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('evaluate-api', {
+        body: {
+          team_id: teamId,
+          event_id: eventId,
+          endpoint_url: endpoint,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.success && data?.scores) {
+        setEvaluationScores(data.scores);
+        toast({
+          title: 'Evaluation Complete!',
+          description: `Total Score: ${data.scores.total_score}/100`,
+        });
+      } else {
+        throw new Error(data?.error || 'Evaluation failed');
+      }
+    } catch (error) {
+      console.error('Evaluation error:', error);
+      toast({
+        title: 'Evaluation Failed',
+        description: error instanceof Error ? error.message : 'Could not evaluate API',
+        variant: 'destructive',
+      });
+    } finally {
+      setEvaluating(false);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -287,13 +349,54 @@ export function ApiSubmissionForm({
           </motion.div>
         )}
 
+        {/* Evaluation Scores */}
+        {evaluationScores && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="p-4 rounded-lg border bg-primary/10 border-primary/30"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Trophy className="h-5 w-5 text-primary" />
+              <span className="font-medium text-primary">Evaluation Results</span>
+              <span className="ml-auto text-lg font-display font-bold text-primary">
+                {evaluationScores.total_score}/100
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="p-2 rounded bg-background/50">
+                <p className="text-muted-foreground text-xs">Accuracy</p>
+                <p className="font-semibold">{evaluationScores.accuracy_score}%</p>
+              </div>
+              <div className="p-2 rounded bg-background/50">
+                <p className="text-muted-foreground text-xs">Latency</p>
+                <p className="font-semibold">{evaluationScores.latency_score}%</p>
+              </div>
+              <div className="p-2 rounded bg-background/50">
+                <p className="text-muted-foreground text-xs">Stability</p>
+                <p className="font-semibold">{evaluationScores.stability_score}%</p>
+              </div>
+              <div className="p-2 rounded bg-background/50">
+                <p className="text-muted-foreground text-xs">Penalties</p>
+                <p className="font-semibold text-destructive">-{evaluationScores.penalty_points}</p>
+              </div>
+            </div>
+            
+            <div className="mt-3 pt-3 border-t border-border/50 text-xs text-muted-foreground">
+              Tests: {evaluationScores.details.tests_passed}/{evaluationScores.details.tests_passed + evaluationScores.details.tests_failed} passed | 
+              Avg latency: {evaluationScores.details.avg_latency_ms}ms
+            </div>
+          </motion.div>
+        )}
+
         {/* Actions */}
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <Button
             variant="outline"
             onClick={handleTest}
             disabled={!endpoint || testing || isLocked}
-            className="flex-1"
+            className="flex-1 min-w-[120px]"
           >
             {testing ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -305,7 +408,7 @@ export function ApiSubmissionForm({
           <Button
             onClick={handleSubmit}
             disabled={!testResult?.success || loading || isLocked}
-            className="flex-1"
+            className="flex-1 min-w-[120px]"
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -313,6 +416,19 @@ export function ApiSubmissionForm({
               <Send className="h-4 w-4 mr-2" />
             )}
             Submit
+          </Button>
+          <Button
+            variant="accent"
+            onClick={handleEvaluate}
+            disabled={!testResult?.success || evaluating}
+            className="flex-1 min-w-[120px]"
+          >
+            {evaluating ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Play className="h-4 w-4 mr-2" />
+            )}
+            Evaluate
           </Button>
         </div>
       </div>

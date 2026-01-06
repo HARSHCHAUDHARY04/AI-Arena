@@ -7,6 +7,7 @@ import { ParticleBackground } from '@/components/ParticleBackground';
 import { LiveScoreboard } from '@/components/LiveScoreboard';
 import { EventTimer } from '@/components/EventTimer';
 import { ApiSubmissionForm } from '@/components/ApiSubmissionForm';
+import { TeamManagement } from '@/components/TeamManagement';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -43,7 +44,7 @@ export default function Dashboard() {
   const [activeEvent, setActiveEvent] = useState<Event | null>(null);
   const [userTeam, setUserTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'submit' | 'scoreboard'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'team' | 'submit' | 'scoreboard'>('overview');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -100,6 +101,7 @@ export default function Dashboard() {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: FileText },
+    { id: 'team', label: 'Team', icon: Users },
     { id: 'submit', label: 'Submit API', icon: Code2 },
     { id: 'scoreboard', label: 'Scoreboard', icon: Trophy },
   ];
@@ -256,6 +258,27 @@ export default function Dashboard() {
                 )}
               </div>
 
+              <div className="space-y-6">
+                {activeEvent && (
+                  <EventTimer
+                    startTime={activeEvent.start_time}
+                    endTime={activeEvent.end_time}
+                    status={activeEvent.status}
+                  />
+                )}
+                <LiveScoreboard eventId={activeEvent?.id} limit={5} />
+              </div>
+            </>
+          )}
+
+          {activeTab === 'team' && (
+            <>
+              <div className="lg:col-span-2">
+                <TeamManagement 
+                  eventId={activeEvent?.id} 
+                  onTeamChange={fetchData} 
+                />
+              </div>
               <div className="space-y-6">
                 {activeEvent && (
                   <EventTimer
