@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { 
   Send, 
   CheckCircle, 
@@ -147,6 +148,14 @@ export function ApiSubmissionForm({
         .eq('event_id', eventId)
         .single();
 
+      // Convert testResult to Json compatible format
+      const testResultJson: Json = {
+        success: testResult.success,
+        response: testResult.response as Json,
+        latency: testResult.latency ?? null,
+        error: testResult.error ?? null,
+      };
+
       if (existing) {
         // Update existing submission
         const { error } = await supabase
@@ -155,7 +164,7 @@ export function ApiSubmissionForm({
             endpoint_url: endpoint,
             is_validated: true,
             last_test_at: new Date().toISOString(),
-            last_test_result: testResult,
+            last_test_result: testResultJson,
           })
           .eq('id', existing.id);
 
@@ -164,14 +173,14 @@ export function ApiSubmissionForm({
         // Create new submission
         const { error } = await supabase
           .from('api_submissions')
-          .insert({
+          .insert([{
             team_id: teamId,
             event_id: eventId,
             endpoint_url: endpoint,
             is_validated: true,
             last_test_at: new Date().toISOString(),
-            last_test_result: testResult as unknown as Record<string, unknown>,
-          });
+            last_test_result: testResultJson,
+          }]);
 
         if (error) throw error;
       }
