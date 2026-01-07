@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
+import Organizer from "./pages/Organizer";
 import Scoreboard from "./pages/Scoreboard";
 import NotFound from "./pages/NotFound";
 
@@ -25,6 +26,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/organizer" element={<Organizer />} />
             <Route path="/scoreboard" element={<Scoreboard />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -10,7 +10,7 @@ interface AuthContextType {
   role: UserRole | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, teamName?: string) => Promise<{ error: Error | null }>;
+  // signUp removed - admin creates users only
   signOut: () => Promise<void>;
 }
 
@@ -88,21 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
-  const signUp = async (email: string, password: string, teamName?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          team_name: teamName,
-        },
-      },
-    });
-    return { error: error as Error | null };
-  };
+  // signUp removed - admin creates users via edge function
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -112,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, role, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, role, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

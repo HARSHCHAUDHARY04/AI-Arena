@@ -1,55 +1,50 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { ParticleBackground } from '@/components/ParticleBackground';
-import { Zap, Mail, Lock, User, Loader2, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { ArrowLeft, Zap, Lock, Mail, Shield } from 'lucide-react';
 import { z } from 'zod';
 
-const authSchema = z.object({
-  email: z.string().email('Invalid email address').max(255),
-  password: z.string().min(6, 'Password must be at least 6 characters').max(100),
-  teamName: z.string().max(50).optional(),
+const loginSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
 export default function AuthPage() {
-  const [searchParams] = useSearchParams();
-  const [isSignUp, setIsSignUp] = useState(searchParams.get('mode') === 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [teamName, setTeamName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, user, role } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   useEffect(() => {
-    if (user) {
-      navigate('/dashboard');
+    if (user && role) {
+      if (role === 'admin') navigate('/admin');
+      else if (role === 'organizer') navigate('/organizer');
+      else navigate('/dashboard');
     }
-  }, [user, navigate]);
+  }, [user, role, navigate]);
 
-  const validateForm = (): boolean => {
+  const validateForm = () => {
     try {
-      authSchema.parse({ email, password, teamName: isSignUp ? teamName : undefined });
+      loginSchema.parse({ email, password });
       setErrors({});
       return true;
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        const newErrors: Record<string, string> = {};
-        err.errors.forEach((e) => {
-          if (e.path[0]) {
-            newErrors[e.path[0] as string] = e.message;
-          }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const fieldErrors: { email?: string; password?: string } = {};
+        error.errors.forEach((err) => {
+          if (err.path[0] === 'email') fieldErrors.email = err.message;
+          if (err.path[0] === 'password') fieldErrors.password = err.message;
         });
-        setErrors(newErrors);
+        setErrors(fieldErrors);
       }
       return false;
     }
@@ -57,189 +52,80 @@ export default function AuthPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!validateForm()) return;
     
     setLoading(true);
-
-    try {
-      if (isSignUp) {
-        const { error } = await signUp(email, password, teamName);
-        if (error) {
-          if (error.message.includes('already registered')) {
-            toast({
-              title: 'Account Exists',
-              description: 'This email is already registered. Please sign in instead.',
-              variant: 'destructive',
-            });
-          } else {
-            throw error;
-          }
-        } else {
-          toast({
-            title: 'Account Created!',
-            description: 'Welcome to AI Battle Arena!',
-          });
-        }
-      } else {
-        const { error } = await signIn(email, password);
-        if (error) {
-          if (error.message.includes('Invalid login')) {
-            toast({
-              title: 'Login Failed',
-              description: 'Invalid email or password. Please try again.',
-              variant: 'destructive',
-            });
-          } else {
-            throw error;
-          }
-        }
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
+    const { error } = await signIn(email, password);
+    
+    if (error) {
+      toast.error('Login failed. Please check your credentials.');
+    } else {
+      toast.success('Welcome back!');
     }
+    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen bg-background relative overflow-hidden">
       <ParticleBackground />
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl" />
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/20 rounded-full blur-3xl" />
       
-      {/* Background Effects */}
-      <div className="absolute inset-0 bg-hero-pattern" />
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl" />
+      <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
+          <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8 transition-colors">
+            <ArrowLeft className="w-4 h-4" /> Back to Home
+          </Link>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 w-full max-w-md px-4"
-      >
-        {/* Back Link */}
-        <Link 
-          to="/" 
-          className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary mb-8 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Home
-        </Link>
-
-        <div className="glass-card p-8">
-          {/* Logo */}
-          <div className="flex items-center justify-center gap-2 mb-8">
-            <div className="relative">
-              <Zap className="h-10 w-10 text-primary" />
-              <div className="absolute inset-0 blur-lg bg-primary/50" />
-            </div>
-            <span className="font-display font-bold text-xl neon-text">AI BATTLE ARENA</span>
-          </div>
-
-          {/* Title */}
-          <h1 className="font-display text-2xl font-bold text-center mb-2">
-            {isSignUp ? 'Join The Battle' : 'Welcome Back'}
-          </h1>
-          <p className="text-muted-foreground text-center mb-8">
-            {isSignUp 
-              ? 'Create your account and start competing' 
-              : 'Sign in to access your dashboard'
-            }
-          </p>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10"
-                  disabled={loading}
-                />
+          <div className="glass-card p-8 rounded-2xl border border-border/50">
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/20 mb-4">
+                <Shield className="w-8 h-8 text-primary" />
               </div>
-              {errors.email && (
-                <p className="text-sm text-destructive">{errors.email}</p>
-              )}
+              <h1 className="text-2xl font-display font-bold neon-text mb-2">Secure Login</h1>
+              <p className="text-muted-foreground text-sm">Enter your credentials provided by the administrator</p>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10"
-                  disabled={loading}
-                />
-              </div>
-              {errors.password && (
-                <p className="text-sm text-destructive">{errors.password}</p>
-              )}
-            </div>
-
-            {isSignUp && (
-              <div className="space-y-2">
-                <Label htmlFor="teamName">Team Name (Optional)</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="teamName"
-                    type="text"
-                    placeholder="Your team name"
-                    value={teamName}
-                    onChange={(e) => setTeamName(e.target.value)}
-                    className="pl-10"
-                    disabled={loading}
-                  />
+            <div className="bg-accent/10 border border-accent/30 rounded-lg p-4 mb-6">
+              <div className="flex items-start gap-3">
+                <Lock className="w-5 h-5 text-accent mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-accent">Admin-Only Access</p>
+                  <p className="text-xs text-muted-foreground mt-1">Credentials are assigned by the administrator.</p>
                 </div>
               </div>
-            )}
+            </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              variant="hero"
-              size="lg"
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : isSignUp ? (
-                'Create Account'
-              ) : (
-                'Sign In'
-              )}
-            </Button>
-          </form>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="email">User ID / Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input id="email" type="email" placeholder="your.email@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10" required />
+                </div>
+                {errors.email && <p className="text-destructive text-sm">{errors.email}</p>}
+              </div>
 
-          {/* Toggle */}
-          <div className="mt-6 text-center">
-            <p className="text-muted-foreground">
-              {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
-              <button
-                type="button"
-                onClick={() => setIsSignUp(!isSignUp)}
-                className="text-primary hover:underline font-medium"
-              >
-                {isSignUp ? 'Sign In' : 'Sign Up'}
-              </button>
-            </p>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10" required />
+                </div>
+                {errors.password && <p className="text-destructive text-sm">{errors.password}</p>}
+              </div>
+
+              <Button type="submit" variant="hero" size="xl" className="w-full" disabled={loading}>
+                {loading ? <span className="flex items-center gap-2"><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Authenticating...</span> : <span className="flex items-center gap-2"><Zap className="w-4 h-4" />Access Arena</span>}
+              </Button>
+            </form>
+
+            <div className="mt-6 pt-6 border-t border-border/30 text-center">
+              <p className="text-sm text-muted-foreground">Need access? <span className="text-primary">Contact your administrator</span></p>
+            </div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
 }

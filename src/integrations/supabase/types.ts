@@ -105,6 +105,7 @@ export type Database = {
       }
       events: {
         Row: {
+          api_contract: string | null
           created_at: string
           created_by: string | null
           dataset_url: string | null
@@ -120,6 +121,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          api_contract?: string | null
           created_at?: string
           created_by?: string | null
           dataset_url?: string | null
@@ -135,6 +137,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          api_contract?: string | null
           created_at?: string
           created_by?: string | null
           dataset_url?: string | null
@@ -272,23 +275,32 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          dataset_description: string | null
+          dataset_name: string | null
           event_id: string | null
           id: string
           name: string
+          shortlist_status: string
         }
         Insert: {
           created_at?: string
           created_by?: string | null
+          dataset_description?: string | null
+          dataset_name?: string | null
           event_id?: string | null
           id?: string
           name: string
+          shortlist_status?: string
         }
         Update: {
           created_at?: string
           created_by?: string | null
+          dataset_description?: string | null
+          dataset_name?: string | null
           event_id?: string | null
           id?: string
           name?: string
+          shortlist_status?: string
         }
         Relationships: [
           {
@@ -326,6 +338,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_create_user_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["user_role"]
+          _user_id: string
+        }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["user_role"]
