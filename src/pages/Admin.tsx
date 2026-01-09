@@ -5,6 +5,9 @@ import { useAuth } from '@/lib/auth';
 import { Navbar } from '@/components/Navbar';
 import { ParticleBackground } from '@/components/ParticleBackground';
 import { LiveScoreboard } from '@/components/LiveScoreboard';
+import { AdminAnalytics } from '@/components/AdminAnalytics';
+import { TeamShortlistManager } from '@/components/TeamShortlistManager';
+import { AdminEventTimer } from '@/components/AdminEventTimer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,16 +17,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   Plus,
   Calendar,
-  Users,
   Play,
   Pause,
   Square,
   Loader2,
-  Settings,
   Trophy,
   FileText,
   Lock,
-  Unlock
+  Unlock,
+  Users,
+  BarChart3,
+  Timer
 } from 'lucide-react';
 
 interface Event {
@@ -32,6 +36,7 @@ interface Event {
   description: string | null;
   problem_statement: string | null;
   rules: string | null;
+  api_contract: string | null;
   status: string;
   start_time: string | null;
   end_time: string | null;
@@ -47,6 +52,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'teams' | 'timer'>('overview');
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   
   // Form state
   const [newEvent, setNewEvent] = useState({
@@ -54,6 +61,7 @@ export default function AdminDashboard() {
     description: '',
     problem_statement: '',
     rules: '',
+    api_contract: '',
     start_time: '',
     end_time: '',
   });
@@ -83,6 +91,9 @@ export default function AdminDashboard() {
 
       if (error) throw error;
       setEvents(data || []);
+      if (data && data.length > 0 && !selectedEvent) {
+        setSelectedEvent(data[0]);
+      }
     } catch (error) {
       console.error('Error fetching events:', error);
     } finally {
@@ -102,6 +113,7 @@ export default function AdminDashboard() {
           description: newEvent.description || null,
           problem_statement: newEvent.problem_statement || null,
           rules: newEvent.rules || null,
+          api_contract: newEvent.api_contract || null,
           start_time: newEvent.start_time || null,
           end_time: newEvent.end_time || null,
           created_by: user?.id,
@@ -119,6 +131,7 @@ export default function AdminDashboard() {
         description: '',
         problem_statement: '',
         rules: '',
+        api_contract: '',
         start_time: '',
         end_time: '',
       });
@@ -204,6 +217,13 @@ export default function AdminDashboard() {
     }
   };
 
+  const tabs = [
+    { id: 'overview', label: 'Analytics', icon: BarChart3 },
+    { id: 'events', label: 'Events', icon: Calendar },
+    { id: 'teams', label: 'Teams & Shortlist', icon: Users },
+    { id: 'timer', label: 'Timer Control', icon: Timer },
+  ];
+
   return (
     <div className="min-h-screen relative">
       <ParticleBackground />
@@ -228,6 +248,26 @@ export default function AdminDashboard() {
             New Event
           </Button>
         </motion.div>
+
+        {/* Analytics Overview */}
+        <div className="mb-8">
+          <AdminAnalytics />
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          {tabs.map((tab) => (
+            <Button
+              key={tab.id}
+              variant={activeTab === tab.id ? 'default' : 'ghost'}
+              onClick={() => setActiveTab(tab.id as typeof activeTab)}
+              className="flex items-center gap-2"
+            >
+              <tab.icon className="h-4 w-4" />
+              {tab.label}
+            </Button>
+          ))}
+        </div>
 
         {/* Create Event Form */}
         {showCreateForm && (
@@ -267,6 +307,17 @@ export default function AdminDashboard() {
                   value={newEvent.problem_statement}
                   onChange={(e) => setNewEvent({ ...newEvent, problem_statement: e.target.value })}
                   placeholder="Detailed problem statement for participants..."
+                  rows={4}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="api_contract">API Contract</Label>
+                <Textarea
+                  id="api_contract"
+                  value={newEvent.api_contract}
+                  onChange={(e) => setNewEvent({ ...newEvent, api_contract: e.target.value })}
+                  placeholder="API specifications and contract details..."
                   rows={4}
                 />
               </div>
@@ -316,138 +367,192 @@ export default function AdminDashboard() {
           </motion.div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Events List */}
-          <div className="lg:col-span-2 space-y-4">
-            <h2 className="font-display font-bold text-xl flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              Events
-            </h2>
-            
-            {events.length === 0 ? (
-              <div className="glass-card p-12 text-center">
-                <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <h3 className="font-display font-semibold text-lg mb-2">No Events Yet</h3>
-                <p className="text-muted-foreground">
-                  Create your first event to get started.
-                </p>
-              </div>
-            ) : (
-              events.map((event, index) => (
-                <motion.div
-                  key={event.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="glass-card p-6"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="font-display font-semibold text-lg">{event.title}</h3>
-                      <p className={`text-sm capitalize ${getStatusColor(event.status)}`}>
-                        {event.status}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="icon"
-                        variant={event.submissions_locked ? 'destructive' : 'outline'}
-                        onClick={() => toggleSubmissions(event.id, !event.submissions_locked)}
-                        title={event.submissions_locked ? 'Unlock Submissions' : 'Lock Submissions'}
-                      >
-                        {event.submissions_locked ? (
-                          <Lock className="h-4 w-4" />
-                        ) : (
-                          <Unlock className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
+        {/* Tab Content */}
+        {activeTab === 'overview' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <LiveScoreboard limit={10} />
+            </div>
+            <div>
+              {selectedEvent && (
+                <AdminEventTimer event={selectedEvent} onUpdate={fetchEvents} />
+              )}
+            </div>
+          </div>
+        )}
 
-                  <p className="text-muted-foreground text-sm mb-4">
-                    {event.description || 'No description'}
+        {activeTab === 'events' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Events List */}
+            <div className="lg:col-span-2 space-y-4">
+              <h2 className="font-display font-bold text-xl flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                Events
+              </h2>
+              
+              {events.length === 0 ? (
+                <div className="glass-card p-12 text-center">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <h3 className="font-display font-semibold text-lg mb-2">No Events Yet</h3>
+                  <p className="text-muted-foreground">
+                    Create your first event to get started.
                   </p>
+                </div>
+              ) : (
+                events.map((event, index) => (
+                  <motion.div
+                    key={event.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className={`glass-card p-6 cursor-pointer transition-all ${
+                      selectedEvent?.id === event.id ? 'ring-2 ring-primary' : ''
+                    }`}
+                    onClick={() => setSelectedEvent(event)}
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="font-display font-semibold text-lg">{event.title}</h3>
+                        <p className={`text-sm capitalize ${getStatusColor(event.status)}`}>
+                          {event.status}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="icon"
+                          variant={event.submissions_locked ? 'destructive' : 'outline'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSubmissions(event.id, !event.submissions_locked);
+                          }}
+                          title={event.submissions_locked ? 'Unlock Submissions' : 'Lock Submissions'}
+                        >
+                          {event.submissions_locked ? (
+                            <Lock className="h-4 w-4" />
+                          ) : (
+                            <Unlock className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    {event.status === 'draft' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => updateEventStatus(event.id, 'registration')}
-                      >
-                        Open Registration
-                      </Button>
-                    )}
-                    {event.status === 'registration' && (
-                      <Button
-                        size="sm"
-                        variant="success"
-                        onClick={() => updateEventStatus(event.id, 'active')}
-                      >
-                        <Play className="h-4 w-4" />
-                        Start Event
-                      </Button>
-                    )}
-                    {event.status === 'active' && (
-                      <>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      {event.description || 'No description'}
+                    </p>
+
+                    <div className="flex flex-wrap gap-2">
+                      {event.status === 'draft' && (
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => updateEventStatus(event.id, 'paused')}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateEventStatus(event.id, 'registration');
+                          }}
                         >
-                          <Pause className="h-4 w-4" />
-                          Pause
+                          Open Registration
                         </Button>
+                      )}
+                      {event.status === 'registration' && (
                         <Button
                           size="sm"
-                          variant="destructive"
-                          onClick={() => updateEventStatus(event.id, 'completed')}
+                          variant="success"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateEventStatus(event.id, 'active');
+                          }}
                         >
-                          <Square className="h-4 w-4" />
-                          End Event
+                          <Play className="h-4 w-4" />
+                          Start Event
                         </Button>
-                      </>
-                    )}
-                    {event.status === 'paused' && (
-                      <Button
-                        size="sm"
-                        variant="success"
-                        onClick={() => updateEventStatus(event.id, 'active')}
-                      >
-                        <Play className="h-4 w-4" />
-                        Resume
-                      </Button>
-                    )}
-                  </div>
-                </motion.div>
-              ))
-            )}
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            <div className="glass-card p-6">
-              <h3 className="font-display font-bold text-lg mb-4 flex items-center gap-2">
-                <Settings className="h-5 w-5 text-primary" />
-                Quick Stats
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total Events</span>
-                  <span className="font-display font-semibold">{events.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Active Events</span>
-                  <span className="font-display font-semibold text-success">
-                    {events.filter(e => e.status === 'active').length}
-                  </span>
-                </div>
-              </div>
+                      )}
+                      {event.status === 'active' && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateEventStatus(event.id, 'paused');
+                            }}
+                          >
+                            <Pause className="h-4 w-4" />
+                            Pause
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateEventStatus(event.id, 'completed');
+                            }}
+                          >
+                            <Square className="h-4 w-4" />
+                            End Event
+                          </Button>
+                        </>
+                      )}
+                      {event.status === 'paused' && (
+                        <Button
+                          size="sm"
+                          variant="success"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateEventStatus(event.id, 'active');
+                          }}
+                        >
+                          <Play className="h-4 w-4" />
+                          Resume
+                        </Button>
+                      )}
+                    </div>
+                  </motion.div>
+                ))
+              )}
             </div>
 
-            <LiveScoreboard limit={5} />
+            {/* Sidebar */}
+            <div className="space-y-6">
+              <LiveScoreboard limit={5} />
+            </div>
           </div>
-        </div>
+        )}
+
+        {activeTab === 'teams' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <TeamShortlistManager eventId={selectedEvent?.id} />
+            <div className="space-y-6">
+              <LiveScoreboard limit={10} />
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'timer' && selectedEvent && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <AdminEventTimer event={selectedEvent} onUpdate={fetchEvents} />
+            <div className="glass-card p-6">
+              <h3 className="font-display font-bold text-lg mb-4">Select Event</h3>
+              <div className="space-y-2">
+                {events.map((event) => (
+                  <button
+                    key={event.id}
+                    onClick={() => setSelectedEvent(event)}
+                    className={`w-full p-3 rounded-lg text-left transition-all ${
+                      selectedEvent?.id === event.id
+                        ? 'bg-primary/20 border border-primary/30'
+                        : 'bg-muted/30 border border-border/50 hover:border-primary/30'
+                    }`}
+                  >
+                    <p className="font-semibold">{event.title}</p>
+                    <p className={`text-sm capitalize ${getStatusColor(event.status)}`}>
+                      {event.status}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
