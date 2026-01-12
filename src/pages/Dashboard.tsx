@@ -7,23 +7,24 @@ import { ParticleBackground } from '@/components/ParticleBackground';
 import { LiveScoreboard } from '@/components/LiveScoreboard';
 import { EventTimer } from '@/components/EventTimer';
 import { ApiSubmissionForm } from '@/components/ApiSubmissionForm';
-import { TeamManagement } from '@/components/TeamManagement';
+import { AnnouncementListener } from '@/components/AnnouncementListener';
+import { LeaderboardGraph } from '@/components/LeaderboardGraph';
 import { ShortlistStatusCard } from '@/components/ShortlistStatusCard';
 import EventDetails from '@/components/EventDetails';
 import { Button } from '@/components/ui/button';
+import { TeamDetailSection } from '@/components/TeamDetailSection';
+import { EventRulesSection } from '@/components/EventRulesSection';
 import db from '@/integrations/mongo/client';
-import { 
-  FileText, 
-  Code2, 
-  Trophy, 
-  Clock, 
-  Users, 
+import {
+  FileText,
+  Code2,
+  Trophy,
+  Clock,
+  Users,
   AlertCircle,
   CheckCircle,
   Loader2,
   Award,
-  Rocket,
-  BookOpen
 } from 'lucide-react';
 
 interface Event {
@@ -67,7 +68,7 @@ export default function Dashboard() {
   const [qualificationStatus, setQualificationStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'team' | 'submit' | 'scoreboard'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'submit' | 'scoreboard'>('overview');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -78,14 +79,23 @@ export default function Dashboard() {
   useEffect(() => {
     if (user) {
       fetchData();
+      // Poll for updates every 10 seconds (for shortlist status, event changes, etc.)
+      const interval = setInterval(fetchData, 10000);
+      return () => clearInterval(interval);
     }
   }, [user]);
 
   const fetchData = async () => {
+    // Avoid setting loading=true on background polls to prevent UI flicker
+    // We can use a ref or check if data exists to decide whether to show spinner
+
     try {
-      console.log('Fetching dashboard data for user:', user?.id);
-      setLoading(true);
-      
+      // Only show loading spinner on INITIAL load (when no event/team data exists yet)
+      if (!activeEvent && !userTeam) {
+        setLoading(true);
+      }
+
+
       // Fetch active event
       try {
         const eventRes = await fetch(`http://localhost:4000/api/events?status=active`);
@@ -107,10 +117,10 @@ export default function Dashboard() {
           if (teamMemberRes.ok) {
             const teamMembersResp = await teamMemberRes.json();
             console.log('Team members:', teamMembersResp);
-            
+
             if (teamMembersResp && teamMembersResp.length > 0) {
               const teamMembership = teamMembersResp[0];
-              
+
               const teamRes = await fetch(`http://localhost:4000/api/teams/${teamMembership.team_id}`);
               if (teamRes.ok) {
                 const team = await teamRes.json();
@@ -127,7 +137,7 @@ export default function Dashboard() {
                 };
 
                 setUserTeam(normalisedTeam);
-                
+
                 // Fetch all team members for this team
                 const allMembersRes = await fetch(
                   `http://localhost:4000/api/team_members?team_id=${normalisedTeam.id || normalisedTeam._id}`
@@ -177,7 +187,6 @@ export default function Dashboard() {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: FileText },
-    { id: 'team', label: 'Team', icon: Users },
     { id: 'submit', label: 'Submit API', icon: Code2 },
     { id: 'scoreboard', label: 'Scoreboard', icon: Trophy },
   ];
@@ -195,6 +204,7 @@ export default function Dashboard() {
     <div className="min-h-screen relative">
       <ParticleBackground />
       <Navbar />
+      <AnnouncementListener />
 
       <main className="container mx-auto px-4 pt-24 pb-12 relative z-10">
         <motion.div
@@ -252,9 +262,8 @@ export default function Dashboard() {
             transition={{ delay: 0.3 }}
             className="glass-card p-4 flex items-center gap-4"
           >
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-              userTeam ? 'bg-success/10' : 'bg-warning/10'
-            }`}>
+            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${userTeam ? 'bg-success/10' : 'bg-warning/10'
+              }`}>
               {userTeam ? (
                 <CheckCircle className="h-6 w-6 text-success" />
               ) : (
@@ -274,38 +283,34 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            className={`glass-card p-4 flex items-center gap-4 ${
-              getShortlistStatus() === 'shortlisted' 
-                ? 'border-success/30' 
-                : getShortlistStatus() === 'not_shortlisted'
+            className={`glass-card p-4 flex items-center gap-4 ${getShortlistStatus() === 'shortlisted'
+              ? 'border-success/30'
+              : getShortlistStatus() === 'not_shortlisted'
                 ? 'border-destructive/30'
                 : 'border-warning/30'
-            }`}
+              }`}
           >
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-              getShortlistStatus() === 'shortlisted' 
-                ? 'bg-success/10' 
-                : getShortlistStatus() === 'not_shortlisted'
+            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${getShortlistStatus() === 'shortlisted'
+              ? 'bg-success/10'
+              : getShortlistStatus() === 'not_shortlisted'
                 ? 'bg-destructive/10'
                 : 'bg-warning/10'
-            }`}>
-              <Award className={`h-6 w-6 ${
-                getShortlistStatus() === 'shortlisted' 
-                  ? 'text-success' 
-                  : getShortlistStatus() === 'not_shortlisted'
+              }`}>
+              <Award className={`h-6 w-6 ${getShortlistStatus() === 'shortlisted'
+                ? 'text-success'
+                : getShortlistStatus() === 'not_shortlisted'
                   ? 'text-destructive'
                   : 'text-warning'
-              }`} />
+                }`} />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Shortlist</p>
-              <p className={`font-display font-semibold capitalize ${
-                getShortlistStatus() === 'shortlisted' 
-                  ? 'text-success' 
-                  : getShortlistStatus() === 'not_shortlisted'
+              <p className={`font-display font-semibold capitalize ${getShortlistStatus() === 'shortlisted'
+                ? 'text-success'
+                : getShortlistStatus() === 'not_shortlisted'
                   ? 'text-destructive'
                   : 'text-warning'
-              }`}>
+                }`}>
                 {getShortlistStatus().replace('_', ' ')}
               </p>
             </div>
@@ -328,55 +333,16 @@ export default function Dashboard() {
         </div>
 
         {/* Tab Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {activeTab === 'overview' && (
-            <>
+        {activeTab === 'overview' && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-8"
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
-                {/* Team Details Card */}
                 {userTeam && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="glass-card p-6"
-                  >
-                    <h2 className="font-display font-bold text-xl mb-4 flex items-center gap-2">
-                      <Users className="h-5 w-5 text-primary" />
-                      Team Details
-                    </h2>
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Team Name</p>
-                        <p className="font-semibold">{userTeam.name}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Team ID</p>
-                        <p className="font-mono text-xs">
-                          {(userTeam.id || userTeam._id || '').toString().slice(0, 8) || 'N/A'}...
-                        </p>
-                      </div>
-                    </div>
-                    {userTeam.dataset_name && (
-                      <div className="p-4 rounded-lg bg-muted/30 border border-border/50">
-                        <p className="text-sm font-medium mb-1">Assigned Dataset: {userTeam.dataset_name}</p>
-                        {userTeam.dataset_description && (
-                          <p className="text-xs text-muted-foreground">{userTeam.dataset_description}</p>
-                        )}
-                      </div>
-                    )}
-                    <div className="mt-4">
-                      <p className="text-sm font-medium mb-2">Team Members ({teamMembers.length})</p>
-                      <div className="flex flex-wrap gap-2">
-                        {teamMembers.map((member) => (
-                          <span
-                            key={member.id}
-                            className="px-3 py-1 rounded-full bg-primary/10 text-sm"
-                          >
-                            {member.profiles?.team_name || member.profiles?.email || 'Unknown'}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </motion.div>
+                  <TeamDetailSection />
                 )}
 
                 {/* Event Coming Soon / Event Details */}
@@ -384,7 +350,7 @@ export default function Dashboard() {
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className=""
+                    className="space-y-6"
                   >
                     <EventDetails
                       event={activeEvent}
@@ -406,12 +372,12 @@ export default function Dashboard() {
               <div className="space-y-6">
                 {/* Shortlist Status Card */}
                 {userTeam && (
-                  <ShortlistStatusCard 
-                    status={getShortlistStatus()} 
+                  <ShortlistStatusCard
+                    status={getShortlistStatus()}
                     teamName={userTeam.name}
                   />
                 )}
-                
+
                 {activeEvent && (
                   <EventTimer
                     startTime={activeEvent.start_time}
@@ -421,78 +387,67 @@ export default function Dashboard() {
                 )}
                 <LiveScoreboard eventId={activeEvent?.id} limit={5} />
               </div>
-            </>
-          )}
+            </div>
 
-          {activeTab === 'team' && (
-            <>
-              <div className="lg:col-span-2">
-                <TeamManagement 
-                  eventId={activeEvent?.id} 
-                  onTeamChange={fetchData} 
+            {/* Full Width Rules Section */}
+            {activeEvent && (
+              <EventRulesSection />
+            )}
+          </motion.div>
+        )}
+
+        {activeTab === 'submit' && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+          >
+            <div className="lg:col-span-2">
+              {userTeam && activeEvent ? (
+                <ApiSubmissionForm
+                  teamId={userTeam.id}
+                  eventId={activeEvent.id}
+                  isLocked={activeEvent.submissions_locked}
                 />
-              </div>
-              <div className="space-y-6">
-                {userTeam && (
-                  <ShortlistStatusCard 
-                    status={getShortlistStatus()} 
-                    teamName={userTeam.name}
-                  />
-                )}
-                {activeEvent && (
-                  <EventTimer
-                    startTime={activeEvent.start_time}
-                    endTime={activeEvent.end_time}
-                    status={activeEvent.status}
-                  />
-                )}
-                <LiveScoreboard eventId={activeEvent?.id} limit={5} />
-              </div>
-            </>
-          )}
+              ) : (
+                <div className="glass-card p-12 text-center">
+                  <Code2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <h3 className="font-display font-semibold text-lg mb-2">
+                    {!userTeam ? 'Join a Team First' : 'No Active Event'}
+                  </h3>
+                  <p className="text-muted-foreground">
+                    {!userTeam
+                      ? 'You need to be part of a team to submit an API.'
+                      : 'There is no active event to submit to.'
+                    }
+                  </p>
+                </div>
+              )}
+            </div>
+            <div>
+              {activeEvent && (
+                <EventTimer
+                  startTime={activeEvent.start_time}
+                  endTime={activeEvent.end_time}
+                  status={activeEvent.status}
+                />
+              )}
+            </div>
+          </motion.div>
+        )}
 
-          {activeTab === 'submit' && (
-            <>
-              <div className="lg:col-span-2">
-                {userTeam && activeEvent ? (
-                  <ApiSubmissionForm
-                    teamId={userTeam.id}
-                    eventId={activeEvent.id}
-                    isLocked={activeEvent.submissions_locked}
-                  />
-                ) : (
-                  <div className="glass-card p-12 text-center">
-                    <Code2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                    <h3 className="font-display font-semibold text-lg mb-2">
-                      {!userTeam ? 'Join a Team First' : 'No Active Event'}
-                    </h3>
-                    <p className="text-muted-foreground">
-                      {!userTeam 
-                        ? 'You need to be part of a team to submit an API.'
-                        : 'There is no active event to submit to.'
-                      }
-                    </p>
-                  </div>
-                )}
-              </div>
-              <div>
-                {activeEvent && (
-                  <EventTimer
-                    startTime={activeEvent.start_time}
-                    endTime={activeEvent.end_time}
-                    status={activeEvent.status}
-                  />
-                )}
-              </div>
-            </>
-          )}
-
-          {activeTab === 'scoreboard' && (
-            <div className="lg:col-span-3">
+        {activeTab === 'scoreboard' && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+          >
+            <div className="lg:col-span-3 space-y-6">
+              {activeEvent && <LeaderboardGraph eventId={activeEvent.id} />}
               <LiveScoreboard eventId={activeEvent?.id} limit={20} />
             </div>
-          )}
-        </div>
+          </motion.div>
+        )}
       </main>
     </div>
   );

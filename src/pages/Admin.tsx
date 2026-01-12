@@ -8,13 +8,14 @@ import { LiveScoreboard } from '@/components/LiveScoreboard';
 import { AdminAnalytics } from '@/components/AdminAnalytics';
 import { TeamShortlistManager } from '@/components/TeamShortlistManager';
 import { AdminEventTimer } from '@/components/AdminEventTimer';
+import { AdminAnnouncementForm } from '@/components/AdminAnnouncementForm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import db from '@/integrations/mongo/client';
-import { 
+import {
   Plus,
   Calendar,
   Play,
@@ -27,7 +28,8 @@ import {
   Unlock,
   Users,
   BarChart3,
-  Timer
+  Timer,
+  AlertCircle
 } from 'lucide-react';
 
 interface Event {
@@ -59,7 +61,7 @@ export default function AdminDashboard() {
   const [loadingRounds, setLoadingRounds] = useState(false);
   const [creatingRound, setCreatingRound] = useState(false);
   const [newRound, setNewRound] = useState({ number: 1, title: '', dataset_name: '', dataset_description: '', problem_statement: '', evaluation_criteria: '' });
-  
+
   // Form state
   const [newEvent, setNewEvent] = useState({
     title: '',
@@ -174,7 +176,7 @@ export default function AdminDashboard() {
   const updateEventStatus = async (eventId: string, status: string) => {
     try {
       const updates: Record<string, unknown> = { status };
-      
+
       if (status === 'active') {
         updates.submissions_locked = true;
       }
@@ -256,7 +258,6 @@ export default function AdminDashboard() {
   };
 
   const triggerEvaluation = async (roundId: string) => {
-    // Placeholder: mark round as completed and optionally create evaluation job
     try {
       const { error } = await db.from('rounds').update({ status: 'completed' }).eq('id', roundId);
       if (error) throw error;
@@ -270,7 +271,6 @@ export default function AdminDashboard() {
 
   const eliminateTeamsForRound = async (roundId: string, teamIds: string[]) => {
     try {
-      // mark qualifications for teams as eliminated for this round
       for (const teamId of teamIds) {
         const { error } = await db.from('qualifications').upsert([{ round_id: roundId, team_id: teamId, status: 'eliminated' }]);
         if (error) console.error('eliminate error', error);
@@ -292,8 +292,8 @@ export default function AdminDashboard() {
 
       toast({
         title: locked ? 'Submissions Locked' : 'Submissions Unlocked',
-        description: locked 
-          ? 'Teams can no longer submit or update APIs' 
+        description: locked
+          ? 'Teams can no longer submit or update APIs'
           : 'Teams can now submit APIs',
       });
       fetchEvents();
@@ -367,10 +367,7 @@ export default function AdminDashboard() {
           </Button>
         </motion.div>
 
-        {/* Analytics Overview */}
-        <div className="mb-8">
-          <AdminAnalytics />
-        </div>
+
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
@@ -488,7 +485,9 @@ export default function AdminDashboard() {
         {/* Tab Content */}
         {activeTab === 'overview' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 space-y-6">
+              <AdminAnalytics />
+              <AdminAnnouncementForm />
               <LiveScoreboard limit={10} />
             </div>
             <div>
@@ -507,7 +506,7 @@ export default function AdminDashboard() {
                 <Calendar className="h-5 w-5 text-primary" />
                 Events
               </h2>
-              
+
               {events.length === 0 ? (
                 <div className="glass-card p-12 text-center">
                   <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
@@ -520,12 +519,13 @@ export default function AdminDashboard() {
                 events.map((event, index) => (
                   <motion.div
                     key={event.id}
+                    layout
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className={`glass-card p-6 cursor-pointer transition-all ${
-                      selectedEvent?.id === event.id ? 'ring-2 ring-primary' : ''
-                    }`}
+                    whileHover={{ scale: 1.01, boxShadow: "0 10px 30px -10px rgba(0,0,0,0.2)" }}
+                    transition={{ duration: 0.2 }}
+                    className={`glass-card p-6 cursor-pointer transition-all ${selectedEvent?.id === event.id ? 'ring-2 ring-primary bg-primary/5' : 'hover:bg-muted/10'
+                      }`}
                     onClick={() => setSelectedEvent(event)}
                   >
                     <div className="flex items-start justify-between mb-4">
@@ -706,11 +706,10 @@ export default function AdminDashboard() {
                   <button
                     key={event.id}
                     onClick={() => setSelectedEvent(event)}
-                    className={`w-full p-3 rounded-lg text-left transition-all ${
-                      selectedEvent?.id === event.id
-                        ? 'bg-primary/20 border border-primary/30'
-                        : 'bg-muted/30 border border-border/50 hover:border-primary/30'
-                    }`}
+                    className={`w-full p-3 rounded-lg text-left transition-all ${selectedEvent?.id === event.id
+                      ? 'bg-primary/20 border border-primary/30'
+                      : 'bg-muted/30 border border-border/50 hover:border-primary/30'
+                      }`}
                   >
                     <p className="font-semibold">{event.title}</p>
                     <p className={`text-sm capitalize ${getStatusColor(event.status)}`}>

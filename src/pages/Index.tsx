@@ -5,10 +5,10 @@ import { EventCard } from '@/components/EventCard';
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import db from '@/integrations/mongo/client';
-import { 
-  Code2, 
-  Cpu, 
-  Zap, 
+import {
+  Code2,
+  Cpu,
+  Zap,
   Trophy,
   ArrowRight
 } from 'lucide-react';
@@ -74,7 +74,7 @@ const Index = () => {
       <ParticleBackground />
       <div className="grid-bg fixed inset-0 pointer-events-none" />
       <Navbar />
-      
+
       {/* Hero Section */}
       <HeroSection />
 
@@ -178,7 +178,7 @@ const Index = () => {
             <div className="absolute inset-0 bg-hero-pattern" />
             <div className="absolute top-0 left-1/4 w-64 h-64 bg-primary/20 rounded-full blur-3xl" />
             <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-accent/20 rounded-full blur-3xl" />
-            
+
             <div className="relative z-10">
               <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">
                 Ready to <span className="text-gradient">Compete?</span>
@@ -187,12 +187,16 @@ const Index = () => {
                 Register now and join the ultimate AI competition. Show the world what your algorithms can do.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link to="/auth?mode=signup">
+                <a
+                  href="https://docs.google.com/forms/d/e/1FAIpQLSdsiz9av1FXO3MCLkzd_eJY0v4w_2VPg8vtSnJAy_y8MZfnsw/viewform"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <Button variant="hero" size="xl">
                     <Zap className="h-5 w-5" />
                     Register Now
                   </Button>
-                </Link>
+                </a>
                 <Link to="/scoreboard">
                   <Button variant="outline" size="lg">
                     View Leaderboard

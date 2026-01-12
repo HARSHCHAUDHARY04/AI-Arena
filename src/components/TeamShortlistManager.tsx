@@ -2,16 +2,27 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import db from '@/integrations/mongo/client';
 import { Button } from '@/components/ui/button';
-import { 
-  Users, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Users,
+  CheckCircle,
+  XCircle,
   Clock,
   Loader2,
-  Search
+  Search,
+  Eye
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { AdminTeamDetailCard } from './AdminTeamDetailCard';
+import { MOCK_TEAMS } from '@/lib/mockTeamData';
 
 interface Team {
   id: string;
@@ -32,6 +43,7 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
 
   useEffect(() => {
     fetchTeams();
@@ -50,7 +62,14 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
 
       const { data, error } = await query;
       if (error) throw error;
-      setTeams(data || []);
+
+      // Map _id to id to avoid key collisions and state issues
+      const mappedData = (data || []).map((t: any) => ({
+        ...t,
+        id: t._id ? t._id.toString() : t.id
+      }));
+
+      setTeams(mappedData);
     } catch (error) {
       console.error('Error fetching teams:', error);
     } finally {
@@ -68,7 +87,7 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
 
       if (error) throw error;
 
-      setTeams(teams.map(team => 
+      setTeams(teams.map(team =>
         team.id === teamId ? { ...team, shortlist_status: status } : team
       ));
 
@@ -111,6 +130,12 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
     team.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Helper to find mock data for a team
+  const getMockDataForTeam = (teamName: string) => {
+    // Try to find by name, otherwise return the first one as default
+    return MOCK_TEAMS.find(t => t.teamName.toLowerCase() === teamName.toLowerCase()) || MOCK_TEAMS[0];
+  };
+
   if (loading) {
     return (
       <div className="glass-card p-8 flex items-center justify-center">
@@ -147,7 +172,7 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
         />
       </div>
 
-      <div className="space-y-3 max-h-[400px] overflow-y-auto">
+      <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
         {filteredTeams.length === 0 ? (
           <div className="text-center py-8">
             <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
@@ -157,18 +182,37 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
           filteredTeams.map((team) => (
             <div
               key={team.id}
-              className="p-4 rounded-lg bg-muted/30 border border-border/50"
+              className="p-4 rounded-lg bg-muted/30 border border-border/50 transition-all hover:bg-muted/50"
             >
               <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h4 className="font-semibold">{team.name}</h4>
-                  {team.dataset_name && (
-                    <p className="text-xs text-muted-foreground">Dataset: {team.dataset_name}</p>
-                  )}
+                <div className="flex items-center gap-3">
+                  <div>
+                    <h4 className="font-semibold flex items-center gap-2">
+                      {team.name}
+                    </h4>
+                    {team.dataset_name && (
+                      <p className="text-xs text-muted-foreground">Dataset: {team.dataset_name}</p>
+                    )}
+                  </div>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title="View Details">
+                        <Eye className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[80vh]">
+                      <DialogHeader>
+                        <DialogTitle>Team Details</DialogTitle>
+                      </DialogHeader>
+                      <ScrollArea className="h-full max-h-[60vh] pr-4">
+                        <AdminTeamDetailCard data={getMockDataForTeam(team.name)} />
+                      </ScrollArea>
+                    </DialogContent>
+                  </Dialog>
                 </div>
                 {getStatusBadge(team.shortlist_status)}
               </div>
-              
+
               <div className="flex gap-2">
                 <Button
                   size="sm"

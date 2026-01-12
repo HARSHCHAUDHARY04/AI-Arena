@@ -2,11 +2,11 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth';
-import { 
-  Zap, 
-  Trophy, 
-  Users, 
-  Code2, 
+import {
+  Zap,
+  Trophy,
+  Users,
+  Code2,
   Timer,
   ChevronRight,
   Sparkles
@@ -63,7 +63,7 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10"
           >
-            Deploy your AI models. Compete in real-time challenges. 
+            Deploy your AI models. Compete in real-time challenges.
             Prove your algorithms are the best. The ultimate arena for machine learning warriors.
           </motion.p>
 
@@ -127,24 +127,7 @@ export function HeroSection() {
           </motion.div>
         </div>
 
-        {/* Scroll Indicator */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 1 }}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2"
-        >
-          <div className="flex flex-col items-center gap-2">
-            <span className="text-xs text-muted-foreground uppercase tracking-widest">Scroll</span>
-            <motion.div
-              animate={{ y: [0, 8, 0] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-              className="w-6 h-10 rounded-full border-2 border-primary/30 flex items-start justify-center p-2"
-            >
-              <div className="w-1 h-2 rounded-full bg-primary" />
-            </motion.div>
-          </div>
-        </motion.div>
+
       </div>
     </section>
   );

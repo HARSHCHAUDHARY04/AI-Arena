@@ -31,11 +31,11 @@ app.post('/auth/login', async (req, res) => {
     const ok = await bcrypt.compare(password, user.passwordHash || '');
     if (!ok) return res.status(401).json({ error: 'invalid credentials' });
     const token = jwt.sign({ sub: user._id.toString(), email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-    
+
     // Fetch user role
     const userRole = await db.collection('user_roles').findOne({ user_id: user._id.toString() });
     const role = userRole?.role || 'participant';
-    
+
     res.json({ token, user: { id: user._id.toString(), email: user.email, role } });
   } catch (err) {
     console.error(err);
@@ -171,7 +171,7 @@ function calculateScores(testResults, testCases) {
   const successRate = testResults.length > 0 ? testsPassed / testResults.length : 0;
   const stability_score = successRate * 100;
   const penalty_points = (timeoutCount * 5) + (invalidResponseCount * 10);
-  const total_score = Math.max(0, 
+  const total_score = Math.max(0,
     (accuracy_score * 0.5) + (latency_score * 0.25) + (stability_score * 0.25) - penalty_points
   );
   return {
@@ -234,6 +234,83 @@ app.post('/api/evaluate-api', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'evaluation failed' });
+  }
+});
+
+// Analytics: Mock Score History
+app.get('/api/score-history', async (req, res) => {
+  try {
+    const { event_id } = req.query;
+    if (!event_id) return res.status(400).json({ error: 'event_id required' });
+
+    // Fetch real current scores
+    const topScores = await db.collection('scores')
+      .find({ event_id })
+      .sort({ total_score: -1 })
+      .limit(5)
+      .toArray();
+
+    // Get team names
+    const teamIds = topScores.map(s => new ObjectId(s.team_id));
+    const teams = await db.collection('teams').find({ _id: { $in: teamIds } }).toArray();
+    const teamMap = {};
+    teams.forEach(t => teamMap[t._id.toString()] = t.name);
+
+    // Generate mock history: 5 rounds
+    const rounds = ['Round 1', 'Round 2', 'Round 3', 'Round 4', 'Current'];
+    const data = rounds.map((round, rIndex) => {
+      const point = { name: round };
+      topScores.forEach(score => {
+        const teamName = teamMap[score.team_id] || 'Unknown';
+        // Random progression to reach final score
+        if (rIndex === 4) {
+          point[teamName] = score.total_score;
+        } else {
+          // Progress roughly linearly with some noise
+          const factor = (rIndex + 1) / 5;
+          point[teamName] = Math.max(0, Math.floor(score.total_score * factor * (0.9 + Math.random() * 0.2)));
+        }
+      });
+      return point;
+    });
+
+    res.json({ data, topTeams: topScores.map(s => teamMap[s.team_id] || 'Unknown') });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Announcements
+app.get('/api/announcements', async (req, res) => {
+  try {
+    // Return last 5 active announcements, newest first
+    const announcements = await db.collection('announcements')
+      .find({})
+      .sort({ created_at: -1 })
+      .limit(5)
+      .toArray();
+    res.json(announcements);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+app.post('/api/announcements', async (req, res) => {
+  const { message, type, created_by } = req.body;
+  if (!message) return res.status(400).json({ error: 'message required' });
+  try {
+    const result = await db.collection('announcements').insertOne({
+      message,
+      type: type || 'info', // info, warning, success
+      created_by,
+      created_at: new Date()
+    });
+    res.json({ id: result.insertedId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
   }
 });
 
