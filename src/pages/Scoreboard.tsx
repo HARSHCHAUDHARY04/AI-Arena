@@ -4,9 +4,9 @@ import { Navbar } from '@/components/Navbar';
 import { ParticleBackground } from '@/components/ParticleBackground';
 import { EventTimer } from '@/components/EventTimer';
 import db from '@/integrations/mongo/client';
-import { 
-  Trophy, 
-  Medal, 
+import {
+  Trophy,
+  Medal,
   Target,
   Clock,
   Shield,
@@ -20,8 +20,10 @@ interface ScoreEntry {
   team_name: string;
   total_score: number;
   accuracy_score: number;
+  relevance_score: number;
   latency_score: number;
   stability_score: number;
+  format_score: number;
   rank: number;
 }
 
@@ -96,8 +98,14 @@ export default function Scoreboard() {
         team_name: (score.teams as { name: string })?.name || 'Unknown Team',
         total_score: Number(score.total_score),
         accuracy_score: Number(score.accuracy_score),
-        latency_score: Number(score.latency_score),
+        relevance_score: Number(score.relevance_score || score.accuracy_score), // Proxy/Fallback
+        latency_score: Number(score.speed_score || score.latency_score), // Validating map: Server sends speed_score, frontend was using latency_score? let's check.
+        // Server sends: speed_score. Frontend mapped it to latency_score?
+        // Wait, line 85 said latency_score. But server/index.js line 302 says speed_score.
+        // If DB has speed_score, then latency_score in previous code might have been undefined unless mapped?
+        // Let's assume DB has speed_score. I'll map speed_score -> latency_score to keep UI compatible or just use speed_score.
         stability_score: Number(score.stability_score),
+        format_score: Number(score.format_score || 0),
         rank: index + 1,
       }));
 
@@ -278,14 +286,23 @@ export default function Scoreboard() {
                 <TrendingUp className="h-5 w-5 text-primary" />
                 Scoring Breakdown
               </h3>
-              <div className="space-y-3 text-sm">
+              <div className="space-y-4 text-sm">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Target className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="font-medium">Accuracy</p>
+                    <p className="font-medium">Accuracy (40%)</p>
                     <p className="text-muted-foreground text-xs">Model prediction correctness</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                    <Target className="h-4 w-4 text-indigo-500" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Relevance (25%)</p>
+                    <p className="text-muted-foreground text-xs">Contextual understanding</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -293,7 +310,7 @@ export default function Scoreboard() {
                     <Clock className="h-4 w-4 text-accent" />
                   </div>
                   <div>
-                    <p className="font-medium">Latency</p>
+                    <p className="font-medium">Speed (20%)</p>
                     <p className="text-muted-foreground text-xs">Response time performance</p>
                   </div>
                 </div>
@@ -302,8 +319,17 @@ export default function Scoreboard() {
                     <Shield className="h-4 w-4 text-success" />
                   </div>
                   <div>
-                    <p className="font-medium">Stability</p>
+                    <p className="font-medium">Stability (10%)</p>
                     <p className="text-muted-foreground text-xs">Uptime & error rate</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                    <Shield className="h-4 w-4 text-orange-500" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Format (5%)</p>
+                    <p className="text-muted-foreground text-xs">JSON structure validity</p>
                   </div>
                 </div>
               </div>

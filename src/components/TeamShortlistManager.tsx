@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import db from '@/integrations/mongo/client';
+import db, { API_BASE } from '@/integrations/mongo/client';
 import { Button } from '@/components/ui/button';
 import {
   Users,
@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AdminTeamDetailCard } from './AdminTeamDetailCard';
-import { MOCK_TEAMS } from '@/lib/mockTeamData';
+import { TeamDetailsData, TeamMemberDetails } from '@/lib/mockTeamData';
 
 interface Team {
   id: string;
@@ -43,7 +43,10 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+
+  // State for selected team details
+  const [selectedTeamDetails, setSelectedTeamDetails] = useState<TeamDetailsData | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
     fetchTeams();
@@ -63,7 +66,7 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Map _id to id to avoid key collisions and state issues
+      // Map _id to id
       const mappedData = (data || []).map((t: any) => ({
         ...t,
         id: t._id ? t._id.toString() : t.id
@@ -74,6 +77,51 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
       console.error('Error fetching teams:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTeamDetails = async (team: Team) => {
+    setLoadingDetails(true);
+    setSelectedTeamDetails(null);
+    try {
+      const response = await fetch(`${API_BASE}/api/team_members?team_id=${team.id}`);
+      if (!response.ok) throw new Error('Failed to fetch members');
+      const membersData = await response.json();
+
+      // Transform API data to TeamDetailsData
+      const members: TeamMemberDetails[] = membersData.map((m: any) => {
+        const u = m.user_details || {};
+        return {
+          id: u._id || m.user_id,
+          name: u.name || 'Unknown',
+          // Heuristic: If email is NOT generated, assume Team Lead, otherwise Member.
+          // Fallback to 'Member' if is_generated_email field is missing but looks like internal email
+          role: (!u.is_generated_email) ? 'Team Lead' : 'Member',
+          course: u.course || 'N/A',
+          rollNo: u.roll_number || 'N/A',
+          year: u.year || 'N/A',
+          github: u.github_url,
+          linkedin: u.linkedin_url,
+          phone: u.phone || 'N/A',
+          email: u.email
+        };
+      });
+
+      // Infer details for the team object
+      const details: TeamDetailsData = {
+        teamName: team.name,
+        memberCount: members.length,
+        isGlaStudent: members.some(m => m.email?.includes('gla.ac.in')), // Simple heuristic
+        campusOrCollege: "GLA University", // Default as per constraints
+        members: members
+      };
+
+      setSelectedTeamDetails(details);
+    } catch (error) {
+      console.error('Error fetching team details:', error);
+      toast.error('Failed to load team details');
+    } finally {
+      setLoadingDetails(false);
     }
   };
 
@@ -130,12 +178,6 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
     team.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Helper to find mock data for a team
-  const getMockDataForTeam = (teamName: string) => {
-    // Try to find by name, otherwise return the first one as default
-    return MOCK_TEAMS.find(t => t.teamName.toLowerCase() === teamName.toLowerCase()) || MOCK_TEAMS[0];
-  };
-
   if (loading) {
     return (
       <div className="glass-card p-8 flex items-center justify-center">
@@ -148,7 +190,7 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="glass-card p-6"
+      className="glass-card p-5"
     >
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -196,7 +238,13 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
                   </div>
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" title="View Details">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        title="View Details"
+                        onClick={() => fetchTeamDetails(team)}
+                      >
                         <Eye className="h-4 w-4 text-muted-foreground hover:text-primary" />
                       </Button>
                     </DialogTrigger>
@@ -205,7 +253,17 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
                         <DialogTitle>Team Details</DialogTitle>
                       </DialogHeader>
                       <ScrollArea className="h-full max-h-[60vh] pr-4">
-                        <AdminTeamDetailCard data={getMockDataForTeam(team.name)} />
+                        {loadingDetails ? (
+                          <div className="flex items-center justify-center p-12">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                          </div>
+                        ) : selectedTeamDetails ? (
+                          <AdminTeamDetailCard data={selectedTeamDetails} />
+                        ) : (
+                          <div className="text-center p-8 text-muted-foreground">
+                            Failed to load details.
+                          </div>
+                        )}
                       </ScrollArea>
                     </DialogContent>
                   </Dialog>

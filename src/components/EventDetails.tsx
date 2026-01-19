@@ -14,7 +14,7 @@ export const EventDetails: React.FC<Props> = ({ event, currentRound, qualificati
     organizer: 'GLA University, Mathura / Greater Noida',
     date: 'January 31, 2026',
     time: '10:00 AM onwards',
-    venue: 'R-3042, AB-XII, GLA University, Mathura',
+    venue: '5008, AB-XII, GLA University, Mathura',
     prize: '₹30,000/-',
   };
 

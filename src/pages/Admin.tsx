@@ -8,13 +8,12 @@ import { LiveScoreboard } from '@/components/LiveScoreboard';
 import { AdminAnalytics } from '@/components/AdminAnalytics';
 import { TeamShortlistManager } from '@/components/TeamShortlistManager';
 import { AdminEventTimer } from '@/components/AdminEventTimer';
-import { AdminAnnouncementForm } from '@/components/AdminAnnouncementForm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import db from '@/integrations/mongo/client';
+import db, { API_BASE } from '@/integrations/mongo/client';
 import {
   Plus,
   Calendar,
@@ -29,8 +28,10 @@ import {
   Users,
   BarChart3,
   Timer,
-  AlertCircle
+  AlertCircle,
+  FlaskConical
 } from 'lucide-react';
+import { AdminEvaluationPanel } from '@/components/AdminEvaluationPanel';
 
 interface Event {
   id: string;
@@ -55,7 +56,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'teams' | 'timer'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'teams' | 'timer' | 'evaluation'>('overview');
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [rounds, setRounds] = useState<any[]>([]);
   const [loadingRounds, setLoadingRounds] = useState(false);
@@ -96,7 +97,7 @@ export default function AdminDashboard() {
   const fetchRounds = async (eventId: string) => {
     setLoadingRounds(true);
     try {
-      const res = await fetch(`http://localhost:4000/api/rounds?event_id=${eventId}`);
+      const res = await fetch(`${API_BASE}/api/rounds?event_id=${eventId}`);
       if (res.ok) {
         const data = await res.json();
         setRounds(data || []);
@@ -110,7 +111,7 @@ export default function AdminDashboard() {
 
   const fetchEvents = async () => {
     try {
-      const res = await fetch('http://localhost:4000/api/events');
+      const res = await fetch(`${API_BASE}/api/events`);
       if (res.ok) {
         const data = await res.json();
         setEvents(data || []);
@@ -125,53 +126,8 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleCreateEvent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreating(true);
-
-    try {
-      const { error } = await db
-        .from('events')
-        .insert([{
-          title: newEvent.title,
-          description: newEvent.description || null,
-          problem_statement: newEvent.problem_statement || null,
-          rules: newEvent.rules || null,
-          api_contract: newEvent.api_contract || null,
-          start_time: newEvent.start_time || null,
-          end_time: newEvent.end_time || null,
-          created_by: user?.id,
-        }]);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Event Created!',
-        description: 'Your new event has been created successfully.',
-      });
-
-      setNewEvent({
-        title: '',
-        description: '',
-        problem_statement: '',
-        rules: '',
-        api_contract: '',
-        start_time: '',
-        end_time: '',
-      });
-      setShowCreateForm(false);
-      fetchEvents();
-    } catch (error) {
-      console.error('Error creating event:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to create event',
-        variant: 'destructive',
-      });
-    } finally {
-      setCreating(false);
-    }
-  };
+  // Single Event Mode: No creation form
+  // Round Management: Sequential only.
 
   const updateEventStatus = async (eventId: string, status: string) => {
     try {
@@ -207,25 +163,36 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!selectedEvent) return;
     setCreatingRound(true);
+
+    // Auto-calculate next round number
+    const nextRoundNum = rounds.length + 1;
+    const isFinal = nextRoundNum >= 4; // Assuming 4 rounds structure as per rulebook: R1, R2, R3, Final
+
     try {
       const payload = {
         event_id: selectedEvent.id,
-        number: Number(newRound.number),
-        title: newRound.title || `Round ${newRound.number}`,
-        dataset_name: newRound.dataset_name || null,
-        dataset_description: newRound.dataset_description || null,
-        problem_statement: newRound.problem_statement || null,
-        evaluation_criteria: newRound.evaluation_criteria || null,
+        number: nextRoundNum,
+        title: isFinal ? 'Final Round' : `Round ${nextRoundNum}`,
+        dataset_name: newRound.dataset_name,
+        dataset_description: newRound.dataset_description,
+        dataset_meta: {
+          pdf_url: newRound.problem_statement, // Using problem_statement field for PDF URL temporarily or add specific field
+          questions: newRound.evaluation_criteria?.split('\n').filter(q => q.trim().length > 0) || []
+        },
+        problem_statement: newRound.problem_statement, // Keeping for PDF URL reference in UI
+        evaluation_criteria: newRound.evaluation_criteria, // Keeping for Questions reference in UI
         status: 'upcoming',
         submissions_locked: false,
         created_at: new Date().toISOString(),
+        dataset_locked: true // Locked immediately per rules
       };
 
       const { error } = await db.from('rounds').insert([payload]);
       if (error) throw error;
-      setNewRound({ number: newRound.number + 1, title: '', dataset_name: '', dataset_description: '', problem_statement: '', evaluation_criteria: '' });
+
+      setNewRound({ number: nextRoundNum + 1, title: '', dataset_name: '', dataset_description: '', problem_statement: '', evaluation_criteria: '' });
       fetchRounds(selectedEvent.id);
-      toast({ title: 'Round Created', description: `Round ${payload.number} created.` });
+      toast({ title: 'Round Created', description: `${payload.title} created and dataset locked.` });
     } catch (err) {
       console.error('Error creating round', err);
       toast({ title: 'Error', description: 'Failed to create round', variant: 'destructive' });
@@ -339,6 +306,7 @@ export default function AdminDashboard() {
     { id: 'overview', label: 'Analytics', icon: BarChart3 },
     { id: 'events', label: 'Events', icon: Calendar },
     { id: 'teams', label: 'Teams & Shortlist', icon: Users },
+    { id: 'evaluation', label: 'Evaluation', icon: FlaskConical },
     { id: 'timer', label: 'Timer Control', icon: Timer },
   ];
 
@@ -347,345 +315,251 @@ export default function AdminDashboard() {
       <ParticleBackground />
       <Navbar />
 
-      <main className="container mx-auto px-4 pt-24 pb-12 relative z-10">
+      <main className="container mx-auto px-4 pt-20 pb-8 relative z-10">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between mb-8"
+          className="flex items-center justify-between mb-6"
         >
           <div>
-            <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">
+            <h1 className="font-display text-2xl md:text-3xl font-bold">
               Admin Dashboard
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Manage events, teams, and competition settings
             </p>
           </div>
-          <Button onClick={() => setShowCreateForm(!showCreateForm)} variant="hero">
-            <Plus className="h-4 w-4" />
-            New Event
-          </Button>
+
+          <div className="flex gap-2">
+            {tabs.map((tab) => (
+              <Button
+                key={tab.id}
+                variant={activeTab === tab.id ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                className="flex items-center gap-2"
+              >
+                <tab.icon className="h-4 w-4" />
+                {tab.label}
+              </Button>
+            ))}
+          </div>
         </motion.div>
-
-
-
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-          {tabs.map((tab) => (
-            <Button
-              key={tab.id}
-              variant={activeTab === tab.id ? 'default' : 'ghost'}
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className="flex items-center gap-2"
-            >
-              <tab.icon className="h-4 w-4" />
-              {tab.label}
-            </Button>
-          ))}
-        </div>
-
-        {/* Create Event Form */}
-        {showCreateForm && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            className="glass-card p-6 mb-8"
-          >
-            <h2 className="font-display font-bold text-xl mb-6">Create New Event</h2>
-            <form onSubmit={handleCreateEvent} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Event Title *</Label>
-                  <Input
-                    id="title"
-                    value={newEvent.title}
-                    onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                    placeholder="AI Classification Challenge"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Input
-                    id="description"
-                    value={newEvent.description}
-                    onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                    placeholder="Brief description of the event"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="problem">Problem Statement</Label>
-                <Textarea
-                  id="problem"
-                  value={newEvent.problem_statement}
-                  onChange={(e) => setNewEvent({ ...newEvent, problem_statement: e.target.value })}
-                  placeholder="Detailed problem statement for participants..."
-                  rows={4}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="api_contract">API Contract</Label>
-                <Textarea
-                  id="api_contract"
-                  value={newEvent.api_contract}
-                  onChange={(e) => setNewEvent({ ...newEvent, api_contract: e.target.value })}
-                  placeholder="API specifications and contract details..."
-                  rows={4}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="rules">Rules</Label>
-                <Textarea
-                  id="rules"
-                  value={newEvent.rules}
-                  onChange={(e) => setNewEvent({ ...newEvent, rules: e.target.value })}
-                  placeholder="Competition rules and guidelines..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="start">Start Time</Label>
-                  <Input
-                    id="start"
-                    type="datetime-local"
-                    value={newEvent.start_time}
-                    onChange={(e) => setNewEvent({ ...newEvent, start_time: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="end">End Time</Label>
-                  <Input
-                    id="end"
-                    type="datetime-local"
-                    value={newEvent.end_time}
-                    onChange={(e) => setNewEvent({ ...newEvent, end_time: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <Button type="submit" disabled={creating}>
-                  {creating && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Create Event
-                </Button>
-                <Button type="button" variant="ghost" onClick={() => setShowCreateForm(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </motion.div>
-        )}
-
-        {/* Tab Content */}
         {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <AdminAnalytics />
-              <AdminAnnouncementForm />
-              <LiveScoreboard limit={10} />
-            </div>
-            <div>
-              {selectedEvent && (
-                <AdminEventTimer event={selectedEvent} onUpdate={fetchEvents} />
-              )}
-            </div>
+          <div className="space-y-6">
+            <h2 className="font-display font-bold text-xl flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              Performance Analytics
+            </h2>
+            {selectedEvent ? (
+              <AdminAnalytics eventId={selectedEvent.id} />
+            ) : (
+              <div className="glass-card p-12 text-center">
+                <p className="text-muted-foreground">Loading analytics...</p>
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'events' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Events List */}
+            {/* Single Event Permanent Card */}
             <div className="lg:col-span-2 space-y-4">
               <h2 className="font-display font-bold text-xl flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
-                Events
+                Current Event
               </h2>
 
-              {events.length === 0 ? (
-                <div className="glass-card p-12 text-center">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <h3 className="font-display font-semibold text-lg mb-2">No Events Yet</h3>
-                  <p className="text-muted-foreground">
-                    Create your first event to get started.
-                  </p>
-                </div>
-              ) : (
-                events.map((event, index) => (
-                  <motion.div
-                    key={event.id}
-                    layout
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    whileHover={{ scale: 1.01, boxShadow: "0 10px 30px -10px rgba(0,0,0,0.2)" }}
-                    transition={{ duration: 0.2 }}
-                    className={`glass-card p-6 cursor-pointer transition-all ${selectedEvent?.id === event.id ? 'ring-2 ring-primary bg-primary/5' : 'hover:bg-muted/10'
-                      }`}
-                    onClick={() => setSelectedEvent(event)}
-                  >
-                    <div className="flex items-start justify-between mb-4">
+              {selectedEvent ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="glass-card p-6 ring-2 ring-primary bg-primary/5"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-display font-semibold text-2xl">{selectedEvent.title}</h3>
+                      <p className={`text-sm font-bold uppercase tracking-wider mt-1 ${getStatusColor(selectedEvent.status)}`}>
+                        {selectedEvent.status}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant={selectedEvent.submissions_locked ? 'destructive' : 'outline'}
+                        onClick={() => toggleSubmissions(selectedEvent.id, !selectedEvent.submissions_locked)}
+                      >
+                        {selectedEvent.submissions_locked ? <Lock className="h-4 w-4 mr-2" /> : <Unlock className="h-4 w-4 mr-2" />}
+                        {selectedEvent.submissions_locked ? 'Submissions Locked' : 'Submissions Open'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="bg-black/20 p-4 rounded-lg mb-6">
+                    <p className="text-foreground/90 text-sm">
+                      {selectedEvent.description || 'No description available.'}
+                    </p>
+                    <div className="mt-4 grid grid-cols-2 gap-4 text-xs font-mono text-muted-foreground">
                       <div>
-                        <h3 className="font-display font-semibold text-lg">{event.title}</h3>
-                        <p className={`text-sm capitalize ${getStatusColor(event.status)}`}>
-                          {event.status}
-                        </p>
+                        <span className="block opacity-50">Problem Statement</span>
+                        <span className="text-foreground">{selectedEvent.problem_statement?.substring(0, 50)}...</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="icon"
-                          variant={event.submissions_locked ? 'destructive' : 'outline'}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleSubmissions(event.id, !event.submissions_locked);
-                          }}
-                          title={event.submissions_locked ? 'Unlock Submissions' : 'Lock Submissions'}
-                        >
-                          {event.submissions_locked ? (
-                            <Lock className="h-4 w-4" />
-                          ) : (
-                            <Unlock className="h-4 w-4" />
-                          )}
-                        </Button>
+                      <div>
+                        <span className="block opacity-50">API Contract</span>
+                        <span className="text-foreground">{selectedEvent.api_contract}</span>
                       </div>
                     </div>
+                  </div>
 
-                    <p className="text-muted-foreground text-sm mb-4">
-                      {event.description || 'No description'}
-                    </p>
+                  <div className="flex flex-wrap gap-2 pt-4 border-t border-border/50">
+                    <p className="w-full text-xs text-muted-foreground mb-2">Admin Actions (Use with Caution)</p>
 
-                    <div className="flex flex-wrap gap-2">
-                      {event.status === 'draft' && (
+                    {selectedEvent.status === 'active' && (
+                      <>
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateEventStatus(event.id, 'registration');
-                          }}
+                          onClick={() => updateEventStatus(selectedEvent.id, 'paused')}
                         >
-                          Open Registration
+                          <Pause className="h-4 w-4 mr-2" />
+                          Pause Competition
                         </Button>
-                      )}
-                      {event.status === 'registration' && (
                         <Button
                           size="sm"
-                          variant="success"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateEventStatus(event.id, 'active');
-                          }}
+                          variant="destructive"
+                          onClick={() => updateEventStatus(selectedEvent.id, 'completed')}
                         >
-                          <Play className="h-4 w-4" />
-                          Start Event
+                          <Square className="h-4 w-4 mr-2" />
+                          End Competition
                         </Button>
-                      )}
-                      {event.status === 'active' && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              updateEventStatus(event.id, 'paused');
-                            }}
-                          >
-                            <Pause className="h-4 w-4" />
-                            Pause
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              updateEventStatus(event.id, 'completed');
-                            }}
-                          >
-                            <Square className="h-4 w-4" />
-                            End Event
-                          </Button>
-                        </>
-                      )}
-                      {event.status === 'paused' && (
-                        <Button
-                          size="sm"
-                          variant="success"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateEventStatus(event.id, 'active');
-                          }}
-                        >
-                          <Play className="h-4 w-4" />
-                          Resume
-                        </Button>
-                      )}
-                    </div>
-                  </motion.div>
-                ))
+                      </>
+                    )}
+
+                    {selectedEvent.status === 'paused' && (
+                      <Button
+                        size="sm"
+                        variant="success"
+                        onClick={() => updateEventStatus(selectedEvent.id, 'active')}
+                      >
+                        <Play className="h-4 w-4 mr-2" />
+                        Resume Competition
+                      </Button>
+                    )}
+
+                    {selectedEvent.status === 'completed' && (
+                      <span className="text-sm font-bold text-destructive flex items-center">
+                        <Square className="h-4 w-4 mr-2" /> Event Ended
+                      </span>
+                    )}
+                  </div>
+                </motion.div>
+              ) : (
+                <div className="glass-card p-12 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                  <p className="mt-2 text-muted-foreground">Loading Event Details...</p>
+                </div>
               )}
             </div>
 
             {/* Sidebar: Rounds Management */}
             <div className="space-y-6">
-              {selectedEvent ? (
+              {selectedEvent && (
                 <div className="glass-card p-4">
                   <h3 className="font-display font-bold text-lg mb-3">Rounds for {selectedEvent.title}</h3>
 
-                  <div className="space-y-3 mb-3">
+                  <div className="space-y-3 mb-6 max-h-[300px] overflow-y-auto custom-scrollbar">
                     {loadingRounds ? (
                       <div className="text-sm text-muted-foreground">Loading rounds...</div>
                     ) : rounds.length === 0 ? (
-                      <div className="text-sm text-muted-foreground">No rounds yet. Create one below.</div>
+                      <div className="text-sm text-muted-foreground italic">No rounds created yet.</div>
                     ) : (
                       rounds.map((r) => (
-                        <div key={r.id} className="p-3 rounded-lg border border-border/50 bg-muted/10">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-semibold">Round {r.number}: {r.title}</p>
-                              <p className="text-xs text-muted-foreground">Status: <span className="capitalize">{r.status || 'upcoming'}</span></p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button size="icon" onClick={() => updateRoundStatus(r.id, 'live')} title="Make Live">
-                                <Play className="h-4 w-4" />
+                        <div key={r.id} className={`p-3 rounded-lg border text-sm ${r.status === 'live' ? 'border-primary/50 bg-primary/5' : 'border-border/50 bg-muted/10'}`}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-bold">Round {r.number}</span>
+                            <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded ${r.status === 'live' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                              {r.status}
+                            </span>
+                          </div>
+                          <p className="text-xs truncate mb-2">{r.title}</p>
+
+                          <div className="flex items-center justify-end gap-1">
+                            {r.status === 'upcoming' && (
+                              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateRoundStatus(r.id, 'live')} title="Start Round">
+                                <Play className="h-3 w-3 text-success" />
                               </Button>
-                              <Button size="icon" onClick={() => updateRoundStatus(r.id, 'completed')} title="Complete">
-                                <Square className="h-4 w-4" />
+                            )}
+                            {r.status === 'live' && (
+                              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateRoundStatus(r.id, 'completed')} title="End Round">
+                                <Square className="h-3 w-3 text-destructive" />
                               </Button>
-                              <Button size="icon" onClick={() => toggleRoundLock(r.id, !r.submissions_locked)} title={r.submissions_locked ? 'Unlock' : 'Lock'}>
-                                {r.submissions_locked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                              </Button>
-                            </div>
+                            )}
+                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => toggleRoundLock(r.id, !r.submissions_locked)} title={r.submissions_locked ? 'Unlock Submissions' : 'Lock Submissions'}>
+                              {r.submissions_locked ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+                            </Button>
                           </div>
                         </div>
                       ))
                     )}
                   </div>
 
-                  <form onSubmit={handleCreateRound} className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input type="number" value={newRound.number} min={1} onChange={(e) => setNewRound({ ...newRound, number: Number(e.target.value) })} />
-                      <Input placeholder="Round Title" value={newRound.title} onChange={(e) => setNewRound({ ...newRound, title: e.target.value })} />
-                    </div>
-                    <Input placeholder="Dataset name" value={newRound.dataset_name} onChange={(e) => setNewRound({ ...newRound, dataset_name: e.target.value })} />
-                    <Input placeholder="Dataset short description" value={newRound.dataset_description} onChange={(e) => setNewRound({ ...newRound, dataset_description: e.target.value })} />
-                    <Textarea placeholder="Problem statement (optional)" value={newRound.problem_statement} onChange={(e) => setNewRound({ ...newRound, problem_statement: e.target.value })} rows={2} />
-                    <Textarea placeholder="Evaluation criteria (optional)" value={newRound.evaluation_criteria} onChange={(e) => setNewRound({ ...newRound, evaluation_criteria: e.target.value })} rows={2} />
-                    <div className="flex gap-2">
-                      <Button type="submit" disabled={creatingRound}>{creatingRound ? 'Creating...' : 'Create Round'}</Button>
-                      <Button type="button" variant="ghost" onClick={() => setNewRound({ number: newRound.number + 1, title: '', dataset_name: '', dataset_description: '', problem_statement: '', evaluation_criteria: '' })}>Reset</Button>
-                    </div>
-                  </form>
+                  {/* Add New Round Form */}
+                  <div className="border-t border-border/50 pt-4">
+                    <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                      <Plus className="h-4 w-4" /> Add Next Round
+                    </h4>
+                    <form onSubmit={handleCreateRound} className="space-y-3">
+                      <div>
+                        <Label className="text-xs">Dataset Name</Label>
+                        <Input
+                          value={newRound.dataset_name}
+                          onChange={e => setNewRound({ ...newRound, dataset_name: e.target.value })}
+                          placeholder="e.g. Finance_Corpus_v1"
+                          className="h-8 text-xs"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Dataset Description</Label>
+                        <Input
+                          value={newRound.dataset_description}
+                          onChange={e => setNewRound({ ...newRound, dataset_description: e.target.value })}
+                          placeholder="Short description"
+                          className="h-8 text-xs"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">PDF URL (Input)</Label>
+                        <Input
+                          value={newRound.problem_statement}
+                          onChange={e => setNewRound({ ...newRound, problem_statement: e.target.value })}
+                          placeholder="https://..."
+                          className="h-8 text-xs font-mono"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Questions (One per line)</Label>
+                        <Textarea
+                          value={newRound.evaluation_criteria}
+                          onChange={e => setNewRound({ ...newRound, evaluation_criteria: e.target.value })}
+                          placeholder="Q1..."
+                          className="text-xs min-h-[80px]"
+                          required
+                        />
+                      </div>
+                      <Button type="submit" disabled={creatingRound} className="w-full h-8 text-xs">
+                        {creatingRound ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create & Lock Dataset'}
+                      </Button>
+                    </form>
+                  </div>
                 </div>
-              ) : (
-                <LiveScoreboard limit={5} />
               )}
             </div>
           </div>
         )}
+
 
         {activeTab === 'teams' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -696,29 +570,14 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {activeTab === 'evaluation' && selectedEvent && (
+          <AdminEvaluationPanel eventId={selectedEvent.id} />
+        )}
+
         {activeTab === 'timer' && selectedEvent && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <AdminEventTimer event={selectedEvent} onUpdate={fetchEvents} />
-            <div className="glass-card p-6">
-              <h3 className="font-display font-bold text-lg mb-4">Select Event</h3>
-              <div className="space-y-2">
-                {events.map((event) => (
-                  <button
-                    key={event.id}
-                    onClick={() => setSelectedEvent(event)}
-                    className={`w-full p-3 rounded-lg text-left transition-all ${selectedEvent?.id === event.id
-                      ? 'bg-primary/20 border border-primary/30'
-                      : 'bg-muted/30 border border-border/50 hover:border-primary/30'
-                      }`}
-                  >
-                    <p className="font-semibold">{event.title}</p>
-                    <p className={`text-sm capitalize ${getStatusColor(event.status)}`}>
-                      {event.status}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <p className="text-muted-foreground">Timer control for the main event.</p>
           </div>
         )}
       </main>

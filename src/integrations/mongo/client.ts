@@ -1,5 +1,5 @@
 // MongoDB API Client - Replaces Supabase with REST calls to the local Express server.
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 function jsonResponse(res: Response) {
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -110,9 +110,20 @@ function from(collection: string) {
         eq: (field: string, value: any) => ({
           async then(resolve: any, reject: any) {
             try {
+              // Optimization: If updating by ID, skip the fetch-search step
+              if (field === 'id' || field === '_id') {
+                await fetch(`${API_BASE}/api/${collection}/${value}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload),
+                });
+                resolve({ data: [{ ...payload, id: value }], error: null });
+                return;
+              }
+
               const res = await fetch(`${API_BASE}/api/${collection}?${field}=${encodeURIComponent(value)}`);
               const docs = await jsonResponse(res);
-              
+
               for (const doc of docs) {
                 const id = doc._id || doc.id;
                 await fetch(`${API_BASE}/api/${collection}/${id}`, {
@@ -158,7 +169,7 @@ function from(collection: string) {
           const url = buildUrl();
           const res = await fetch(url);
           let data = await jsonResponse(res);
-          
+
           if (orderField) {
             data = data.sort((a: any, b: any) => {
               const aVal = a[orderField];
@@ -168,9 +179,9 @@ function from(collection: string) {
               return 0;
             });
           }
-          
+
           if (limitCount != null) data = data.slice(0, limitCount);
-          
+
           resolve({ data, error: null });
         } catch (error) {
           reject({ data: null, error });

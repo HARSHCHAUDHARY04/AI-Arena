@@ -39,7 +39,7 @@ export function LeaderboardGraph({ eventId }: LeaderboardGraphProps) {
         return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
     }
 
-    if (data.length === 0) {
+    if (!data || data.length === 0) {
         return <div className="text-center p-8 text-muted-foreground">Not enough data for graph.</div>;
     }
 
@@ -64,7 +64,7 @@ export function LeaderboardGraph({ eventId }: LeaderboardGraphProps) {
                             itemStyle={{ color: '#fff' }}
                         />
                         <Legend />
-                        {topTeams.map((team, index) => (
+                        {topTeams && topTeams.map((team, index) => (
                             <Line
                                 key={team}
                                 type="monotone"

@@ -192,8 +192,8 @@ const Index = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Button variant="hero" size="xl">
-                    <Zap className="h-5 w-5" />
+                  <Button size="xl" className="font-display font-bold text-lg bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-600 hover:to-cyan-700 shadow-lg hover:shadow-emerald-500/25 transition-all duration-300">
+                    <Zap className="h-5 w-5 mr-2" />
                     Register Now
                   </Button>
                 </a>

@@ -77,24 +77,24 @@ export function HeroSection() {
             {user ? (
               <>
                 <Link to="/dashboard">
-                  <Button variant="hero" size="xl" className="group">
-                    <Zap className="h-5 w-5" />
+                  <Button size="xl" className="font-display font-bold text-lg bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-lg hover:shadow-orange-500/25 transition-all duration-300 group">
+                    <Zap className="h-5 w-5 mr-2" />
                     Enter Arena
-                    <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                    <ChevronRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
               </>
             ) : (
               <>
                 <Link to="/auth">
-                  <Button variant="hero" size="xl">
-                    <Zap className="h-5 w-5" />
+                  <Button size="xl" className="font-display font-bold text-lg bg-indigo-600 hover:bg-indigo-700 shadow-lg hover:shadow-indigo-500/25 border border-indigo-500/50">
+                    <Zap className="h-5 w-5 mr-2" />
                     Sign In
                   </Button>
                 </Link>
                 <Link to="/scoreboard">
                   <Button variant="outline" size="xl">
-                    <Trophy className="h-5 w-5" />
+                    <Trophy className="h-5 w-5 mr-2" />
                     View Leaderboard
                   </Button>
                 </Link>

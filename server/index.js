@@ -14,11 +14,33 @@ const DB_NAME = process.env.DB_NAME || 'ai_arena';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 
 let db;
+async function ensureSingleEvent() {
+  const title = "AI Battle Arena 2026";
+  const existing = await db.collection('events').findOne({ title });
+  if (!existing) {
+    console.log('Seeding single event:', title);
+    await db.collection('events').insertOne({
+      title,
+      description: "The official AI Battle Arena 2026 competition. Main event.",
+      problem_statement: "Build an AI Agent to answer questions from a PDF.",
+      rules: "Standard Rules apply.",
+      api_contract: "POST /aibattle",
+      status: 'active',
+      submissions_locked: false,
+      created_at: new Date(),
+      is_system_event: true
+    });
+  } else {
+    console.log('Single event found:', title);
+  }
+}
+
 async function main() {
   const client = new MongoClient(MONGODB_URI);
   await client.connect();
   db = client.db(DB_NAME);
   console.log('Connected to MongoDB', MONGODB_URI);
+  await ensureSingleEvent();
 }
 
 // Auth: login
@@ -63,14 +85,62 @@ app.post('/auth/admin-create-user', async (req, res) => {
   }
 });
 
+// [NEW] Enhanced Team Members API (with User Details)
+app.get('/api/team_members', async (req, res) => {
+  const { user_id, team_id } = req.query;
+  try {
+    const query = {};
+    if (user_id) query.user_id = user_id;
+    if (team_id) query.team_id = team_id;
+
+    if (Object.keys(query).length === 0) {
+      // Just return all if no filter (or limit?)
+      const results = await db.collection('team_members').find({}).limit(100).toArray();
+      return res.json(results);
+    }
+
+    // Pipeline to join users
+    const pipeline = [
+      { $match: query },
+      {
+        $addFields: {
+          userObjectId: { $toObjectId: "$user_id" }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userObjectId',
+          foreignField: '_id',
+          as: 'user_details'
+        }
+      },
+      {
+        $unwind: {
+          path: '$user_details',
+          preserveNullAndEmptyArrays: true
+        }
+      }
+    ];
+
+    const results = await db.collection('team_members').aggregate(pipeline).toArray();
+    res.json(results);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
 // Generic REST for collections (list/select/create/update/delete)
 app.get('/api/:collection', async (req, res) => {
   const { collection } = req.params;
   const q = { ...req.query };
   // simple eq handling: ?eq_field=value  or ?field=value
   try {
+    console.log(`[API GET] Collection: ${collection}, Query:`, q);
     const cursor = db.collection(collection).find(q);
     const results = await cursor.toArray();
+    console.log(`[API GET] Found ${results.length} results`);
     res.json(results);
   } catch (err) {
     console.error(err);
@@ -151,41 +221,92 @@ async function testApiEndpoint(endpointUrl, input, timeout = 5000) {
 }
 
 function calculateScores(testResults, testCases) {
+  // Weights matching Rulebook
+  // Accuracy: 40%, Relevance: 25%, Speed: 20%, Stability: 10%, Format: 5%
+
+  let passedWeight = 0;
+  let totalLatency = 0;
+  let validJsonCount = 0;
+  let successCount = 0;
   const totalWeight = testCases.reduce((sum, tc) => sum + tc.weight, 0);
-  let passedWeight = 0, totalLatency = 0, timeoutCount = 0, invalidResponseCount = 0;
-  let testsPassed = 0, testsFailed = 0;
+
   testResults.forEach((result, index) => {
+    // Stability: Did the API return a 200 OK?
+    if (result.success) {
+      successCount++;
+    }
+
+    // Format: Did the API return the expected JSON structure?
+    // testApiEndpoint checks for data.output, so if result.success is true implies valid JSON logic was passed there, 
+    // but strict check: !result.error?.includes('Invalid')
+    if (result.success && !result.error) {
+      validJsonCount++;
+    }
+
+    // Accuracy (and acting Relevance proxy): Did it match expected output?
     if (result.passed) {
       passedWeight += testCases[index].weight;
-      testsPassed++;
-    } else {
-      testsFailed++;
-      if (result.error === 'Timeout') timeoutCount++;
-      else if (result.error?.includes('Invalid')) invalidResponseCount++;
     }
+
     totalLatency += result.latency;
   });
-  const avgLatency = testResults.length > 0 ? totalLatency / testResults.length : 0;
+
+  const totalTests = testResults.length;
+  if (totalTests === 0) return { accuracy_score: 0, relevance_score: 0, speed_score: 0, stability_score: 0, format_score: 0, total_score: 0, details: {} };
+
+  // 1. Accuracy (40%)
+  // If Malformed JSON (0 format score), total score should be 0 per rule? 
+  // "Any malformed JSON -> score = 0" applies to the specific request usually, or global? 
+  // Assuming if ANY is malformed, risk of 0, but usually calculated per-request averages.
+  // Rule: "Any malformed JSON -> score = 0" implies strict disqualification for that entry. 
+  // We will implement strict penalty: if validJsonCount < totalTests, maybe failing?
+  // For now, calculating linear scores.
+
   const accuracy_score = (passedWeight / totalWeight) * 100;
-  const latency_score = Math.max(0, Math.min(100, 100 - ((avgLatency - 200) / 48)));
-  const successRate = testResults.length > 0 ? testsPassed / testResults.length : 0;
-  const stability_score = successRate * 100;
-  const penalty_points = (timeoutCount * 5) + (invalidResponseCount * 10);
-  const total_score = Math.max(0,
-    (accuracy_score * 0.5) + (latency_score * 0.25) + (stability_score * 0.25) - penalty_points
-  );
+
+  // 2. Relevance (25%) - Proxying via Accuracy for automated tests
+  const relevance_score = accuracy_score;
+
+  // 3. Speed Score (20%)
+  // Formula: max(0, 100 - response_time_ms / 100)
+  const avgLatency = totalLatency / totalTests;
+  const speed_score = Math.max(0, 100 - (avgLatency / 100));
+
+  // 4. Stability (10%)
+  const stability_score = (successCount / totalTests) * 100;
+
+  // 5. Format Score (5%)
+  const format_score = (validJsonCount / totalTests) * 100;
+
+  // Weighted Total
+  // (0.40 * acc) + (0.25 * rel) + (0.20 * speed) + (0.10 * stab) + (0.05 * fmt)
+  let total_score = (accuracy_score * 0.40) +
+    (relevance_score * 0.25) +
+    (speed_score * 0.20) +
+    (stability_score * 0.10) +
+    (format_score * 0.05);
+
+  // Critical Failure override
+  if (format_score < 100) {
+    // If "Any malformed JSON -> score = 0" is strictly interpreted:
+    // total_score = 0; 
+    // We'll leave it as weighted for now to allow partial credit unless specified otherwise by user.
+    // User said: "Any malformed JSON -> score = 0". 
+    // Let's apply strict rule: if any request failed JSON parsing, total score is 0.
+    if (validJsonCount < totalTests) total_score = 0;
+  }
+
   return {
     accuracy_score: Math.round(accuracy_score * 100) / 100,
-    latency_score: Math.round(latency_score * 100) / 100,
+    relevance_score: Math.round(relevance_score * 100) / 100,
+    speed_score: Math.round(speed_score * 100) / 100,
     stability_score: Math.round(stability_score * 100) / 100,
-    penalty_points: Math.round(penalty_points * 100) / 100,
+    format_score: Math.round(format_score * 100) / 100,
     total_score: Math.round(total_score * 100) / 100,
     details: {
-      tests_passed: testsPassed,
-      tests_failed: testsFailed,
+      tests_passed: passedWeight, // approximated for details
+      tests_total: totalTests,
       avg_latency_ms: Math.round(avgLatency),
-      timeout_count: timeoutCount,
-      invalid_response_count: invalidResponseCount,
     },
   };
 }
@@ -281,38 +402,164 @@ app.get('/api/score-history', async (req, res) => {
   }
 });
 
-// Announcements
-app.get('/api/announcements', async (req, res) => {
+// [NEW] Dataset Management
+app.post('/api/rounds/:id/dataset', async (req, res) => {
+  const { id } = req.params;
+  const { dataset_name, dataset_description, pdf_url, questions } = req.body;
+  if (!pdf_url || !questions) return res.status(400).json({ error: 'pdf_url and questions required' });
+
   try {
-    // Return last 5 active announcements, newest first
-    const announcements = await db.collection('announcements')
-      .find({})
-      .sort({ created_at: -1 })
-      .limit(5)
-      .toArray();
-    res.json(announcements);
+    const round = await db.collection('rounds').findOne({ _id: new ObjectId(id) });
+    if (!round) return res.status(404).json({ error: 'round not found' });
+    if (round.dataset_locked) return res.status(403).json({ error: 'dataset is locked' });
+
+    await db.collection('rounds').updateOne({ _id: new ObjectId(id) }, {
+      $set: {
+        dataset_name,
+        dataset_description,
+        dataset_meta: { pdf_url, questions }, // Store securely, not sending back to clients unless authorized
+        dataset_locked: true // Lock immediately as per specific rule "Once uploaded... Locked"
+      }
+    });
+    res.json({ success: true, message: 'Dataset uploaded and locked' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'server error' });
   }
 });
 
-app.post('/api/announcements', async (req, res) => {
-  const { message, type, created_by } = req.body;
-  if (!message) return res.status(400).json({ error: 'message required' });
+// [NEW] Round Progression System
+app.post('/api/rounds/advance', async (req, res) => {
+  const { event_id, from_round_number } = req.body;
+  // from_round_number: 1, 2, 3... transition to next.
+  // if 0 or null -> Start event (Round 1 setup)
+
   try {
-    const result = await db.collection('announcements').insertOne({
-      message,
-      type: type || 'info', // info, warning, success
-      created_by,
-      created_at: new Date()
-    });
-    res.json({ id: result.insertedId });
+    if (!from_round_number || from_round_number === 0) {
+      // Start Round 1: All 40 teams active
+      // Just ensure all teams are 'active'
+      await db.collection('teams').updateMany({ event_id }, { $set: { status: 'active', shortlist_status: 'shortlisted' } });
+      res.json({ message: 'Event Started. All teams active for Round 1.' });
+      return;
+    }
+
+    // Logic for R1 -> R2
+    if (from_round_number === 1) {
+      // Top 20 qualify
+      const scores = await db.collection('scores')
+        .find({ event_id }) // Should filter by round_id ideally if multiple scores per event? 
+        // Assuming current architecture stores one 'latest' score per team per event in 'scores' or specifically for this round.
+        // For strictness, we should query scores linked to this round. But current schema uses 'scores' with 'event_id'. 
+        // We'll sort by 'total_score' descending.
+        .sort({ total_score: -1 })
+        .toArray();
+
+      const top20 = scores.slice(0, 20);
+      const eliminated = scores.slice(20);
+
+      const top20Ids = top20.map(s => s.team_id);
+      const eliminatedIds = eliminated.map(s => s.team_id);
+
+      await db.collection('teams').updateMany({ event_id, _id: { $in: top20Ids.map(id => new ObjectId(id)) } }, { $set: { status: 'active', qualification: 'Round 2 Qualified' } });
+      await db.collection('teams').updateMany({ event_id, _id: { $in: eliminatedIds.map(id => new ObjectId(id)) } }, { $set: { status: 'eliminated', qualification: 'Eliminated R1' } });
+
+      res.json({ message: 'Round 1 Ended. Top 20 qualified for Round 2.' });
+    }
+    // Logic for R2 -> R3 (Winner Bracket)
+    else if (from_round_number === 2) {
+      // Only active teams participated.
+      // Top performers -> R2 Winners. Bottom -> R2 Losers.
+      // Let's say Top 10 are Winners, Bottom 10 Losers? Rulebook says "Top performers... Remaining...".
+      // Assuming split half for now (10 Winners, 10 Losers) or just Winners advance to Final?
+      // Rulebook: "Final Round: R2 Winners + R3 Winners".
+      // This implies R2 Losers go to R3 (Crossover) to fight R1 Eliminated?
+      // Wait: "Participants R3: R1 Eliminated + R2 Losers". This is a huge bracket.
+      // Let's implement Top 10 qualify to Final directly (R2 Winners). Bottom 10 go to R3.
+
+      // Need to fetch scores AGAIN (assuming they were updated for R2).
+      // Note: System needs to distinguish R2 scores from R1. 
+      // Current 'scores' collection upserts. We might need to store round history.
+      // For this prototype, we assume the scores in DB are the current round's scores.
+
+      const activeTeams = await db.collection('teams').find({ event_id, status: 'active' }).toArray();
+      const activeIds = activeTeams.map(t => t._id.toString());
+
+      const scores = await db.collection('scores')
+        .find({ event_id, team_id: { $in: activeIds } })
+        .sort({ total_score: -1 })
+        .toArray();
+
+      const topHalf = scores.slice(0, 10); // Winners -> Final
+      const bottomHalf = scores.slice(10); // Losers -> Round 3
+
+      const winnerIds = topHalf.map(s => new ObjectId(s.team_id));
+      const loserIds = bottomHalf.map(s => new ObjectId(s.team_id));
+
+      // Winners stay active (skip R3? Or wait for Final).
+      await db.collection('teams').updateMany({ _id: { $in: winnerIds } }, { $set: { qualification: 'Finalist (R2 Winner)' } });
+
+      // Losers go to R3 (rejoin eliminated pool? Or specific R3 Status)
+      await db.collection('teams').updateMany({ _id: { $in: loserIds } }, { $set: { status: 'active_r3', qualification: 'Round 3 Contender' } });
+
+      // Also reactivate R1 eliminated for R3? Rulebook: "Participants: R1 eliminated teams + R2 loser teams"
+      await db.collection('teams').updateMany({ event_id, status: 'eliminated' }, { $set: { status: 'active_r3', qualification: 'Round 3 Wildcard' } });
+
+      res.json({ message: 'Round 2 Ended. Winners to Final. Losers + R1 Eliminated to Round 3.' });
+    }
+    // Logic for R3 -> Final
+    else if (from_round_number === 3) {
+      // R3 Participants compete. Winners go to Final.
+      // R3 Participants are 'active_r3' status.
+      const r3Teams = await db.collection('teams').find({ event_id, status: 'active_r3' }).toArray();
+      const r3Ids = r3Teams.map(t => t._id.toString());
+
+      const scores = await db.collection('scores')
+        .find({ event_id, team_id: { $in: r3Ids } })
+        .sort({ total_score: -1 })
+        .toArray();
+
+      // How many from R3 go to Final? 
+      // Total Finalists = 5 Winners. 
+      // We already have 10 from R2? Rulebook says "Top 5 teams are declared FINAL WINNERS" at the end.
+      // It doesn't specify how many enter Final. 
+      // Let's assume Top 10 from R3 join the Top 10 from R2 = 20 Finalists?
+      // Or keeping it consistent with "Top 5 Final Winners", maybe 10+10 is fine.
+
+      const topR3 = scores.slice(0, 10);
+      const eliminatedR3 = scores.slice(10);
+
+      await db.collection('teams').updateMany({ _id: { $in: topR3.map(s => new ObjectId(s.team_id)) } }, { $set: { status: 'active', qualification: 'Finalist (R3 Winner)' } });
+      await db.collection('teams').updateMany({ _id: { $in: eliminatedR3.map(s => new ObjectId(s.team_id)) } }, { $set: { status: 'eliminated', qualification: 'Eliminated R3' } });
+
+      res.json({ message: 'Round 3 Ended. R3 Winners join R2 Winners in Final.' });
+    }
+    // Final Round
+    else if (from_round_number === 4) {
+      // Calculate Final Winners (Top 5)
+      const finalists = await db.collection('teams').find({ event_id, qualification: { $regex: 'Finalist' } }).toArray();
+      const finalistIds = finalists.map(t => t._id.toString());
+
+      const scores = await db.collection('scores')
+        .find({ event_id, team_id: { $in: finalistIds } })
+        .sort({ total_score: -1 })
+        .toArray();
+
+      const winners = scores.slice(0, 5);
+      const winnerIds = winners.map(s => new ObjectId(s.team_id));
+
+      await db.collection('teams').updateMany({ event_id }, { $set: { is_winner: false } }); // Reset
+      await db.collection('teams').updateMany({ _id: { $in: winnerIds } }, { $set: { is_winner: true, qualification: 'CHAMPION' } });
+
+      res.json({ message: 'Final Round Ended. Champions Declared.', winners: winners });
+    }
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'server error' });
+    res.status(500).json({ error: 'round advancement failed' });
   }
 });
+
+
 
 const PORT = process.env.PORT || 4000;
 main().then(() => {

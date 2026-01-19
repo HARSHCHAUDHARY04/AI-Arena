@@ -32,3 +32,4 @@ supabase/
 
 # Server
 server/node_modules
+server/.env

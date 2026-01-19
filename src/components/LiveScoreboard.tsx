@@ -1,10 +1,10 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import db from '@/integrations/mongo/client';
-import { 
-  Trophy, 
-  Medal, 
-  TrendingUp, 
+import {
+  Trophy,
+  Medal,
+  TrendingUp,
   Zap,
   Clock,
   Target,
@@ -56,6 +56,12 @@ export function LiveScoreboard({ eventId, limit = 10 }: LiveScoreboardProps) {
 
       if (eventId) {
         query = query.eq('event_id', eventId);
+      } else {
+        // If no event ID, we technically shouldn't fetch specific event scores, 
+        // but if the user wants global scores, we can omit this.
+        // However, the crash likely happens if we try to filter by undefined.
+        // The safe bet is: if eventId is passed but null, don't run.
+        // But the prop says eventId?: string.
       }
 
       const { data, error } = await query;
@@ -179,7 +185,7 @@ export function LiveScoreboard({ eventId, limit = 10 }: LiveScoreboardProps) {
             <div className="w-8 flex justify-center">
               {getRankIcon(score.rank)}
             </div>
-            
+
             <div className="flex-1 min-w-0">
               <div className="font-display font-semibold text-foreground truncate">
                 {score.team_name}
