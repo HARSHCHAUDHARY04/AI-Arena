@@ -1,5 +1,6 @@
 // MongoDB API Client - Replaces Supabase with REST calls to the local Express server.
 export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+console.log('API_BASE configured as:', API_BASE);
 
 function jsonResponse(res: Response) {
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
