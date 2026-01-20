@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Loader2, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { API_BASE } from '@/integrations/mongo/client';
 
 interface LeaderboardGraphProps {
     eventId: string;
@@ -20,7 +21,7 @@ export function LeaderboardGraph({ eventId }: LeaderboardGraphProps) {
     const fetchHistory = async () => {
         try {
             setLoading(true);
-            const res = await fetch(`http://localhost:4000/api/score-history?event_id=${eventId}`);
+            const res = await fetch(`${API_BASE}/api/score-history?event_id=${eventId}`);
             if (res.ok) {
                 const json = await res.json();
                 setData(json.data);

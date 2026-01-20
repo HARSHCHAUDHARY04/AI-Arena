@@ -146,3 +146,23 @@ Recommended for events needing low latency or specific hardware.
 - **"Failed to fetch" error**: Ensure the Backend server is running and `VITE_API_URL` is correct.
 - **Admin Dashboard empty**: Verify you are logged in as a user with `role: 'admin'`.
 - **Database connection error**: Check `MONGODB_URI` and ensure MongoDB is running.
+
+## Deployment Troubleshooting & Critical Settings
+
+### 1. Render (Backend) - 404 / Not Found Errors
+If your backend deploy succeeds but all pages return 404:
+- **Cause**: Render is trying to upload the root folder instead of the `server/` folder.
+- **Fix**:
+    1. Go to Render Dashboard -> Select your Web Service.
+    2. Click **Settings** -> Scroll to **Root Directory**.
+    3. Enter `server` (without slashes).
+    4. Save Changes. This will trigger a correct redeploy.
+
+### 2. Vercel (Frontend) - Double Slash Error (`//auth`)
+If you see errors like `https://my-api.onrender.com//auth/login`:
+- **Cause**: Your `VITE_API_URL` has a trailing slash.
+- **Fix**:
+    1. Go to Vercel Project -> Settings -> Environment Variables.
+    2. Edit `VITE_API_URL`.
+    3. Remove the last slash (e.g., change `...onrender.com/` to `...onrender.com`).
+    4. **Redeploy** the latest commit for changes to take effect.

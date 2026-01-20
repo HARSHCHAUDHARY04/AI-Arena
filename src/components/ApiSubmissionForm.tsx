@@ -4,18 +4,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import db from '@/integrations/mongo/client';
-import { 
-  Send, 
-  CheckCircle, 
-  XCircle, 
-  Loader2, 
+import db, { API_BASE } from '@/integrations/mongo/client';
+import {
+  Send,
+  CheckCircle,
+  XCircle,
+  Loader2,
   Clock,
   Zap,
   AlertTriangle,
   Play,
   Trophy
 } from 'lucide-react';
+
+type Json = any;
 
 interface ApiSubmissionFormProps {
   teamId: string;
@@ -45,12 +47,12 @@ interface EvaluationScores {
   };
 }
 
-export function ApiSubmissionForm({ 
-  teamId, 
-  eventId, 
-  currentEndpoint = '', 
+export function ApiSubmissionForm({
+  teamId,
+  eventId,
+  currentEndpoint = '',
   isLocked = false,
-  onSubmit 
+  onSubmit
 }: ApiSubmissionFormProps) {
   const [endpoint, setEndpoint] = useState(currentEndpoint);
   const [loading, setLoading] = useState(false);
@@ -95,7 +97,7 @@ export function ApiSubmissionForm({
       });
 
       const latency = Date.now() - startTime;
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
@@ -233,7 +235,7 @@ export function ApiSubmissionForm({
     setEvaluationScores(null);
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const apiUrl = API_BASE;
       const res = await fetch(`${apiUrl}/api/evaluate-api`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -317,11 +319,10 @@ export function ApiSubmissionForm({
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            className={`p-4 rounded-lg border ${
-              testResult.success 
-                ? 'bg-success/10 border-success/30' 
-                : 'bg-destructive/10 border-destructive/30'
-            }`}
+            className={`p-4 rounded-lg border ${testResult.success
+              ? 'bg-success/10 border-success/30'
+              : 'bg-destructive/10 border-destructive/30'
+              }`}
           >
             <div className="flex items-center gap-2 mb-2">
               {testResult.success ? (
@@ -339,13 +340,13 @@ export function ApiSubmissionForm({
                 </span>
               )}
             </div>
-            
+
             {testResult.success && testResult.response && (
               <pre className="text-xs font-mono bg-background/50 p-2 rounded overflow-x-auto">
                 {JSON.stringify(testResult.response, null, 2)}
               </pre>
             )}
-            
+
             {!testResult.success && testResult.error && (
               <p className="text-sm text-destructive">{testResult.error}</p>
             )}
@@ -366,7 +367,7 @@ export function ApiSubmissionForm({
                 {evaluationScores.total_score}/100
               </span>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="p-2 rounded bg-background/50">
                 <p className="text-muted-foreground text-xs">Accuracy</p>
@@ -385,9 +386,9 @@ export function ApiSubmissionForm({
                 <p className="font-semibold text-destructive">-{evaluationScores.penalty_points}</p>
               </div>
             </div>
-            
+
             <div className="mt-3 pt-3 border-t border-border/50 text-xs text-muted-foreground">
-              Tests: {evaluationScores.details.tests_passed}/{evaluationScores.details.tests_passed + evaluationScores.details.tests_failed} passed | 
+              Tests: {evaluationScores.details.tests_passed}/{evaluationScores.details.tests_passed + evaluationScores.details.tests_failed} passed |
               Avg latency: {evaluationScores.details.avg_latency_ms}ms
             </div>
           </motion.div>

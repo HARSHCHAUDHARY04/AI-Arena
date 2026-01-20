@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth';
+import { API_BASE } from '@/integrations/mongo/client';
 import { Navbar } from '@/components/Navbar';
 import { ParticleBackground } from '@/components/ParticleBackground';
 import { LiveScoreboard } from '@/components/LiveScoreboard';
@@ -69,7 +70,7 @@ export default function Dashboard() {
   const [qualificationStatus, setQualificationStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'submit' | 'scoreboard'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'submit' | 'scoreboard' | 'test'>('overview');
 
   // Keep track of data stringified to prevent unnecessary re-renders
   const lastDataRef = useRef<string>('');
@@ -105,7 +106,7 @@ export default function Dashboard() {
       // Fetch active event
       let newEvent = null;
       try {
-        const eventRes = await fetch(`http://localhost:4000/api/events?status=active`);
+        const eventRes = await fetch(`${API_BASE}/api/events?status=active`);
         if (eventRes.ok) {
           const events = await eventRes.json();
           if (events && events.length > 0) {
@@ -122,7 +123,7 @@ export default function Dashboard() {
 
       if (user) {
         try {
-          const teamMemberRes = await fetch(`http://localhost:4000/api/team_members?user_id=${user.id}`);
+          const teamMemberRes = await fetch(`${API_BASE}/api/team_members?user_id=${user.id}`);
           if (teamMemberRes.ok) {
             const teamMembersResp = await teamMemberRes.json();
 
@@ -131,7 +132,7 @@ export default function Dashboard() {
               const teamMembership = teamMembersResp.find((m: any) => m.user_id === user.id);
 
               if (teamMembership) {
-                const teamRes = await fetch(`http://localhost:4000/api/teams/${teamMembership.team_id}`);
+                const teamRes = await fetch(`${API_BASE}/api/teams/${teamMembership.team_id}`);
                 if (teamRes.ok) {
                   const team = await teamRes.json();
 
@@ -147,7 +148,7 @@ export default function Dashboard() {
 
                   // Fetch all team members for this team
                   const allMembersRes = await fetch(
-                    `http://localhost:4000/api/team_members?team_id=${newTeam.id || newTeam._id}`
+                    `${API_BASE}/api/team_members?team_id=${newTeam.id || newTeam._id}`
                   );
                   if (allMembersRes.ok) {
                     newMembers = await allMembersRes.json();

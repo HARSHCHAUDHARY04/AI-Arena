@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { API_BASE } from '@/integrations/mongo/client';
 
 interface Team {
     id: string;
@@ -69,7 +70,7 @@ export function AdminEvaluationPanel({ eventId }: AdminEvaluationPanelProps) {
         try {
             // Fetch teams for this event
             // Note: Adjust endpoint if your API differs
-            const res = await fetch(`http://localhost:4000/api/teams?event_id=${eventId}`);
+            const res = await fetch(`${API_BASE}/api/teams?event_id=${eventId}`);
             if (res.ok) {
                 const data = await res.json();
                 setTeams(data);
@@ -85,7 +86,7 @@ export function AdminEvaluationPanel({ eventId }: AdminEvaluationPanelProps) {
     const fetchTeamSubmission = async (teamId: string) => {
         // Try to auto-fill the endpoint from their submission
         try {
-            const res = await fetch(`http://localhost:4000/api/api_submissions?team_id=${teamId}&event_id=${eventId}`);
+            const res = await fetch(`${API_BASE}/api/api_submissions?team_id=${teamId}&event_id=${eventId}`);
             if (res.ok) {
                 const data = await res.json();
                 if (data && data.length > 0) {
