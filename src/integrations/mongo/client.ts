@@ -1,5 +1,8 @@
 // MongoDB API Client - Replaces Supabase with REST calls to the local Express server.
-export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+// MongoDB API Client - Replaces Supabase with REST calls to the local Express server.
+const isProd = import.meta.env.PROD;
+export const API_BASE = import.meta.env.VITE_API_URL || (isProd ? 'https://ai-arena-backend-o9lz.onrender.com' : 'http://localhost:4000');
+console.log('Environment:', isProd ? 'PRODUCTION' : 'DEVELOPMENT');
 console.log('API_BASE configured as:', API_BASE);
 
 function jsonResponse(res: Response) {
