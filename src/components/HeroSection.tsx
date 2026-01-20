@@ -40,7 +40,7 @@ export function HeroSection() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/30 bg-primary/10 mb-8"
           >
             <Sparkles className="h-4 w-4 text-primary" />
-            <span className="text-sm text-primary font-medium">Tech Fest 2026 Competition</span>
+            <span className="text-sm text-primary font-medium">Technavya 2.0</span>
           </motion.div>
 
           {/* Main Title */}
