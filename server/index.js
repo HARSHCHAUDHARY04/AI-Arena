@@ -411,6 +411,56 @@ app.get('/api/score-history', async (req, res) => {
   }
 });
 
+// [NEW] Proxy Test Endpoint for Dashboard
+app.post('/api/proxy-test', async (req, res) => {
+  const { endpoint_url, payload } = req.body;
+  if (!endpoint_url || !payload) return res.status(400).json({ error: 'endpoint_url and payload required' });
+
+  const startTime = Date.now();
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+    const response = await fetch(endpoint_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+    const latency = Date.now() - startTime;
+
+    // We want the RAW JSON response to show the user exactly what their API returned
+    let responseData;
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      responseData = await response.json();
+    } else {
+      const text = await response.text();
+      try { responseData = JSON.parse(text); } catch { responseData = text; }
+    }
+
+    res.json({
+      success: response.ok,
+      status: response.status,
+      data: responseData,
+      latency
+    });
+
+  } catch (err) {
+    const latency = Date.now() - startTime;
+    console.error('Proxy Test Failed:', err);
+    res.json({
+      success: false,
+      status: 0,
+      data: null,
+      error: err.message,
+      latency
+    });
+  }
+});
+
 // [NEW] Dataset Management
 app.post('/api/rounds/:id/dataset', async (req, res) => {
   const { id } = req.params;

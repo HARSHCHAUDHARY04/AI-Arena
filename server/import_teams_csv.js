@@ -7,7 +7,7 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 const DB_NAME = process.env.DB_NAME || 'ai_arena';
-const CSV_FILE = path.join(__dirname, 'teams data.csv');
+const CSV_FILE = path.join(__dirname, 'updated team data.csv');
 
 // Helper to split CSV line handling quotes
 // Simple regex to match fields that are either quoted or not containing commas

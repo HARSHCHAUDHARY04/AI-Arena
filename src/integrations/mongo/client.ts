@@ -192,7 +192,7 @@ function from(collection: string) {
 
           if (limitCount != null) data = data.slice(0, limitCount);
 
-          resolve({ data, error: null });
+          resolve({ data, count: data.length, error: null });
         } catch (error) {
           reject({ data: null, error });
         }

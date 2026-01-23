@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { API_BASE } from '@/integrations/mongo/client';
 
 export function ApiTestSection() {
     const [apiUrl, setApiUrl] = useState('https://your-server.com/aibattle');
@@ -51,24 +52,31 @@ export function ApiTestSection() {
         };
 
         try {
-            // Attempt to fetch from the user's API
-            // Note: This might fail due to CORS if the user's server doesn't allow it.
-            // In a real production environment, we might proxy this through our own backend.
-            const res = await fetch(apiUrl, {
+            // Use Backend Proxy to avoid CORS and get full details
+            const res = await fetch(`${API_BASE}/api/proxy-test`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(payload),
+                body: JSON.stringify({
+                    endpoint_url: apiUrl,
+                    payload: payload
+                }),
             });
 
             const data = await res.json();
-            setResponse(data);
+
+            if (data.success) {
+                setResponse(data.data);
+            } else {
+                setError(data.error || `HTTP Error ${data.status}`);
+                // If we have partial data (e.g. error response JSON), show it
+                if (data.data) {
+                    setResponse(data.data);
+                }
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to connect to API");
-            // For demonstration purposes, if it fails (likely due to CORS or non-existent server),
-            // we could show a mock success if the user wants, but better to show the real error
-            // so they know if their server is reachable.
         } finally {
             setLoading(false);
         }
