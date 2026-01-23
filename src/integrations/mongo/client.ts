@@ -12,21 +12,27 @@ function jsonResponse(res: Response) {
 
 const auth = {
   async signInWithPassword({ email, password }: { email: string; password: string }) {
-    const res = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    if (!res.ok) return { error: await res.json() };
-    const data = await res.json();
-    localStorage.setItem('ai_arena_token', data.token);
-    localStorage.setItem('ai_arena_user', JSON.stringify(data.user));
-    localStorage.setItem('ai_arena_role', data.user?.role || 'participant');
-    // Dispatch event asynchronously to allow state to update
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('authChange', { detail: { user: data.user } }));
-    }, 0);
-    return { data };
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!res.ok) return { error: await res.json() }; // This might fail if res is text, but usually json
+      const data = await res.json();
+      localStorage.setItem('ai_arena_token', data.token);
+      localStorage.setItem('ai_arena_user', JSON.stringify(data.user));
+      localStorage.setItem('ai_arena_role', data.user?.role || 'participant');
+      // Dispatch event asynchronously to allow state to update
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('authChange', { detail: { user: data.user } }));
+      }, 0);
+      return { data };
+    } catch (err: any) {
+      console.error('Login error:', err);
+      return { error: { message: err.message || 'Network error. Please try again.' } };
+    }
+
   },
   async signOut() {
     localStorage.removeItem('ai_arena_token');

@@ -87,7 +87,7 @@ export function HeroSection() {
             ) : (
               <>
                 <Link to="/auth">
-                  <Button size="xl" className="font-display font-bold text-lg bg-indigo-600 hover:bg-indigo-700 shadow-lg hover:shadow-indigo-500/25 border border-indigo-500/50">
+                  <Button size="xl" className="font-display font-bold text-lg bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-600 hover:to-cyan-700 shadow-lg hover:shadow-emerald-500/25 transition-all duration-300">
                     <Zap className="h-5 w-5 mr-2" />
                     Sign In
                   </Button>

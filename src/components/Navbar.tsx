@@ -2,12 +2,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
-import { 
-  Zap, 
-  LayoutDashboard, 
-  Trophy, 
-  LogOut, 
-  Menu, 
+import {
+  Zap,
+  LayoutDashboard,
+  Trophy,
+  LogOut,
+  Menu,
   X,
   Shield
 } from 'lucide-react';
@@ -50,8 +50,8 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
-            <Link 
-              to="/scoreboard" 
+            <Link
+              to="/scoreboard"
               className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
             >
               <Trophy className="h-4 w-4" />
@@ -60,21 +60,21 @@ export function Navbar() {
 
             {user ? (
               <>
-                <Link 
+                <Link
                   to={getDashboardLink()}
                   className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
                 >
                   <LayoutDashboard className="h-4 w-4" />
                   Dashboard
                 </Link>
-                
+
                 {role === 'admin' && (
                   <div className="flex items-center gap-1 text-accent text-sm">
                     <Shield className="h-4 w-4" />
                     Admin
                   </div>
                 )}
-                
+
                 <Button variant="ghost" size="sm" onClick={handleSignOut}>
                   <LogOut className="h-4 w-4 mr-2" />
                   Sign Out
@@ -83,7 +83,7 @@ export function Navbar() {
             ) : (
               <div className="flex items-center gap-3">
                 <Link to="/auth">
-                  <Button variant="ghost" size="sm">Sign In</Button>
+                  <Button className="bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-600 hover:to-cyan-700 shadow-md hover:shadow-emerald-500/20 text-white border-0" size="sm">Sign In</Button>
                 </Link>
                 {/* registration disabled: signup removed */}
               </div>
@@ -108,8 +108,8 @@ export function Navbar() {
             className="md:hidden py-4 border-t border-border/30"
           >
             <div className="flex flex-col gap-4">
-              <Link 
-                to="/scoreboard" 
+              <Link
+                to="/scoreboard"
                 className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -119,7 +119,7 @@ export function Navbar() {
 
               {user ? (
                 <>
-                  <Link 
+                  <Link
                     to={getDashboardLink()}
                     className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
                     onClick={() => setMobileMenuOpen(false)}
