@@ -140,69 +140,8 @@ app.get('/api/team_members', async (req, res) => {
   }
 });
 
-// Generic REST for collections (list/select/create/update/delete)
-app.get('/api/:collection', async (req, res) => {
-  const { collection } = req.params;
-  const q = { ...req.query };
-  // simple eq handling: ?eq_field=value  or ?field=value
-  try {
-    console.log(`[API GET] Collection: ${collection}, Query:`, q);
-    const cursor = db.collection(collection).find(q);
-    const results = await cursor.toArray();
-    console.log(`[API GET] Found ${results.length} results`);
-    res.json(results);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'server error' });
-  }
-});
+// Generic REST routes moved to bottom to prevent conflicts with specific API routes
 
-app.get('/api/:collection/:id', async (req, res) => {
-  const { collection, id } = req.params;
-  try {
-    const doc = await db.collection(collection).findOne({ _id: new ObjectId(id) });
-    if (!doc) return res.status(404).json({ error: 'not found' });
-    res.json(doc);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'server error' });
-  }
-});
-
-app.post('/api/:collection', async (req, res) => {
-  const { collection } = req.params;
-  const body = req.body;
-  try {
-    const result = await db.collection(collection).insertOne({ ...body, createdAt: new Date() });
-    res.json({ id: result.insertedId.toString() });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'server error' });
-  }
-});
-
-app.put('/api/:collection/:id', async (req, res) => {
-  const { collection, id } = req.params;
-  const body = req.body;
-  try {
-    const result = await db.collection(collection).updateOne({ _id: new ObjectId(id) }, { $set: body });
-    res.json({ matched: result.matchedCount, modified: result.modifiedCount });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'server error' });
-  }
-});
-
-app.delete('/api/:collection/:id', async (req, res) => {
-  const { collection, id } = req.params;
-  try {
-    const result = await db.collection(collection).deleteOne({ _id: new ObjectId(id) });
-    res.json({ deleted: result.deletedCount });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'server error' });
-  }
-});
 
 // Helper: Test API endpoint
 async function testApiEndpoint(endpointUrl, input, timeout = 5000) {
@@ -619,6 +558,70 @@ app.post('/api/rounds/advance', async (req, res) => {
 });
 
 
+
+
+// Generic REST for collections (list/select/create/update/delete)
+// MOVED HERE: specific routes must come first
+app.get('/api/:collection', async (req, res) => {
+  const { collection } = req.params;
+  const q = { ...req.query };
+  try {
+    console.log(`[API GET] Collection: ${collection}, Query:`, q);
+    const cursor = db.collection(collection).find(q);
+    const results = await cursor.toArray();
+    res.json(results);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+app.get('/api/:collection/:id', async (req, res) => {
+  const { collection, id } = req.params;
+  try {
+    const doc = await db.collection(collection).findOne({ _id: new ObjectId(id) });
+    if (!doc) return res.status(404).json({ error: 'not found' });
+    res.json(doc);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+app.post('/api/:collection', async (req, res) => {
+  const { collection } = req.params;
+  const body = req.body;
+  try {
+    const result = await db.collection(collection).insertOne({ ...body, createdAt: new Date() });
+    res.json({ id: result.insertedId.toString() });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+app.put('/api/:collection/:id', async (req, res) => {
+  const { collection, id } = req.params;
+  const body = req.body;
+  try {
+    const result = await db.collection(collection).updateOne({ _id: new ObjectId(id) }, { $set: body });
+    res.json({ matched: result.matchedCount, modified: result.modifiedCount });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+app.delete('/api/:collection/:id', async (req, res) => {
+  const { collection, id } = req.params;
+  try {
+    const result = await db.collection(collection).deleteOne({ _id: new ObjectId(id) });
+    res.json({ deleted: result.deletedCount });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
 
 const PORT = process.env.PORT || 4000;
 main().then(() => {
