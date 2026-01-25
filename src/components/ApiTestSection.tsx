@@ -229,7 +229,7 @@ export function ApiTestSection() {
                                 </p>
                             </div>
                         ) : response ? (
-                            <pre className="text-xs font-mono text-success-foreground/90 whitespace-pre-wrap">
+                            <pre className="text-xs font-mono text-white whitespace-pre-wrap">
                                 {JSON.stringify(response, null, 2)}
                             </pre>
                         ) : (

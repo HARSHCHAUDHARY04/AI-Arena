@@ -74,6 +74,43 @@ app.post('/auth/login', async (req, res) => {
   }
 });
 
+// [NEW] Change Password Endpoint
+app.post('/auth/change-password', async (req, res) => {
+  const { userId, oldPassword, newPassword } = req.body;
+  if (!userId || !oldPassword || !newPassword) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  try {
+    const user = await db.collection('users').findOne({ _id: new ObjectId(userId) });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Verify old password
+    const ok = await bcrypt.compare(oldPassword, user.passwordHash || '');
+    if (!ok) return res.status(401).json({ error: 'Incorrect old password' });
+
+    // Hash new password
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    // Update both hash and plain text (as per user requirement to store plain)
+    await db.collection('users').updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          passwordHash: newPasswordHash,
+          plain_password: newPassword, // Update the plain reference too
+          updated_at: new Date()
+        }
+      }
+    );
+
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (err) {
+    console.error('Password change error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Admin create user
 app.post('/auth/admin-create-user', async (req, res) => {
   const { email, password, role } = req.body;
