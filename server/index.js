@@ -564,9 +564,15 @@ app.post('/api/rounds/advance', async (req, res) => {
 // MOVED HERE: specific routes must come first
 app.get('/api/:collection', async (req, res) => {
   const { collection } = req.params;
+
+  // Exclude special endpoints that have their own handlers
+  const excludedCollections = ['proxy-test', 'evaluate-api', 'score-history', 'team_members', 'rounds'];
+  if (excludedCollections.includes(collection)) {
+    return res.status(404).json({ error: 'Endpoint not found' });
+  }
+
   const q = { ...req.query };
   try {
-    console.log(`[API GET] Collection: ${collection}, Query:`, q);
     const cursor = db.collection(collection).find(q);
     const results = await cursor.toArray();
     res.json(results);
@@ -590,6 +596,13 @@ app.get('/api/:collection/:id', async (req, res) => {
 
 app.post('/api/:collection', async (req, res) => {
   const { collection } = req.params;
+
+  // Exclude special endpoints
+  const excludedCollections = ['proxy-test', 'evaluate-api', 'team_members', 'rounds'];
+  if (excludedCollections.includes(collection)) {
+    return res.status(404).json({ error: 'Endpoint not found - this route is reserved' });
+  }
+
   const body = req.body;
   try {
     const result = await db.collection(collection).insertOne({ ...body, createdAt: new Date() });
