@@ -33,3 +33,7 @@ supabase/
 # Server
 server/node_modules
 server/.env
+# Team Data
+server/updated team list.csv
+server/team_credentials.csv
+server/updated team details.csv

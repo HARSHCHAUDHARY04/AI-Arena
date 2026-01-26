@@ -2,12 +2,21 @@ const fs = require('fs');
 const path = require('path');
 const { MongoClient } = require('mongodb');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
+// Helper to generate random password
+function generateRandomPassword(length = 10) {
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
+    return Array.from(crypto.randomFillSync(new Uint32Array(length)))
+        .map((x) => chars[x % chars.length])
+        .join('');
+}
+
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 const DB_NAME = process.env.DB_NAME || 'ai_arena';
-const CSV_FILE = path.join(__dirname, 'updated team details.csv');
+const CSV_FILE = path.join(__dirname, 'updated team list.csv');
 
 // Helper to split CSV line handling quotes
 // Simple regex to match fields that are either quoted or not containing commas
@@ -91,7 +100,9 @@ async function importTeams() {
             ];
 
             const memberIds = [];
-            const defaultPassword = `${teamName}#2026`;
+            // generate a little complex password
+            // generate random password
+            const defaultPassword = generateRandomPassword(10);
             const passwordHash = await bcrypt.hash(defaultPassword, 10);
 
             for (const m of memberDefs) {
