@@ -421,8 +421,8 @@ export default function Dashboard() {
 
                 {activeEvent && (
                   <EventTimer
-                    startTime={activeEvent.start_time}
-                    endTime={activeEvent.end_time}
+                    startTime={activeEvent.start_time || new Date().toISOString()}
+                    endTime={activeEvent.end_time || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()}
                     status={activeEvent.status}
                   />
                 )}
@@ -582,8 +582,8 @@ export default function Dashboard() {
 
                   {passwordMessage && (
                     <div className={`p-3 rounded-md text-sm ${passwordMessage.type === 'success'
-                        ? 'bg-success/10 text-success border border-success/20'
-                        : 'bg-destructive/10 text-destructive border border-destructive/20'
+                      ? 'bg-success/10 text-success border border-success/20'
+                      : 'bg-destructive/10 text-destructive border border-destructive/20'
                       }`}>
                       {passwordMessage.text}
                     </div>

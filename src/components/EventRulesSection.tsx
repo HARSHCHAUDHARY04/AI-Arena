@@ -167,6 +167,8 @@ export function EventRulesSection() {
                             <li>Om Lakshkar: +91 7755084628</li>
                             <li>Parth Garg: +91 7850056007</li>
                             <li>Yashasvi Pandey: yashasvi.pandey_cs23@gla.ac.in</li>
+                            <li className="font-semibold text-primary mt-2">Tech Volunteer:</li>
+                            <li>Harsh Chaudhary: 7055797690</li>
                         </ul>
                     </div>
                 </div>
