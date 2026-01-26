@@ -9,6 +9,8 @@ const app = express();
 app.use(cors({
   origin: [
     'https://ai-arena-sepia.vercel.app',
+    'https://www.aibattlearena.in',
+    'https://aibattlearena.in',
     'http://localhost:5173',
     'http://localhost:4173'
   ],
