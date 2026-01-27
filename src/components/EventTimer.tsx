@@ -20,7 +20,7 @@ export function EventTimer({ startTime, endTime, status }: EventTimerProps) {
   useEffect(() => {
     const calculateTime = () => {
       const now = new Date().getTime();
-      
+
       if (!startTime && !endTime) {
         setTimeLeft(null);
         setPhase('upcoming');
@@ -33,6 +33,20 @@ export function EventTimer({ startTime, endTime, status }: EventTimerProps) {
       if (status === 'completed' || (end && now > end)) {
         setPhase('ended');
         setTimeLeft(null);
+        return;
+      }
+
+      if (start && now < start && status !== 'completed') {
+        setPhase('upcoming');
+        const toStart = start - now;
+        if (toStart > 0) {
+          setTimeLeft({
+            days: Math.floor(toStart / (1000 * 60 * 60 * 24)),
+            hours: Math.floor((toStart % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+            minutes: Math.floor((toStart % (1000 * 60 * 60)) / (1000 * 60)),
+            seconds: Math.floor((toStart % (1000 * 60)) / 1000),
+          });
+        }
         return;
       }
 
@@ -52,7 +66,7 @@ export function EventTimer({ startTime, endTime, status }: EventTimerProps) {
         return;
       }
 
-      // Upcoming
+      // Default/Fallback Upcoming logic (redundant but safe)
       setPhase('upcoming');
       const toStart = start - now;
       if (toStart > 0) {
