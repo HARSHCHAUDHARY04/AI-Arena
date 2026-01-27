@@ -137,7 +137,8 @@ async function importTeams() {
                         {
                             $set: {
                                 plain_password: defaultPassword,
-                                passwordHash: passwordHash
+                                passwordHash: passwordHash,
+                                team_name: teamName // [NEW] Add team name
                             }
                         }
                     );
@@ -155,7 +156,8 @@ async function importTeams() {
                         linkedin_url: m.linkedIn,
                         createdAt: new Date(),
                         is_generated_email: !m.isLeader,
-                        plain_password: defaultPassword // [NEW] Stored directly as requested
+                        plain_password: defaultPassword, // [NEW] Stored directly as requested
+                        team_name: teamName // [NEW] Add team name
                     };
                     const res = await db.collection('users').insertOne(newUser);
                     userId = res.insertedId;

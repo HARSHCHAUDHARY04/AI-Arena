@@ -13,7 +13,7 @@ export const EventDetails: React.FC<Props> = ({ event, currentRound, qualificati
     name: "AI Battle Arena (TechTAT’26)",
     organizer: 'GLA University, Mathura / Greater Noida',
     date: 'January 31, 2026',
-    time: '10:00 AM onwards',
+    time: '10:00 AM',
     venue: '5008, AB-XII, GLA University, Mathura',
     prize: '₹30,000/-',
   };
