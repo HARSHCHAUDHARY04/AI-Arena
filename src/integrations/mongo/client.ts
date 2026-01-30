@@ -75,6 +75,14 @@ function from(collection: string) {
     return `${API_BASE}/api/${collection}${query ? `?${query}` : ''}`;
   };
 
+  const getHeaders = () => {
+    const token = localStorage.getItem('ai_arena_token');
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  };
+
   const executor = {
     select(...fields: string[]) {
       return executor;
@@ -98,14 +106,14 @@ function from(collection: string) {
     },
     async single() {
       const url = buildUrl();
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: getHeaders() });
       const docs = await jsonResponse(res);
       return { data: docs[0] || null, error: null };
     },
     async insert(payload: any) {
       const res = await fetch(`${API_BASE}/api/${collection}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify(payload),
       });
       try {
@@ -124,21 +132,23 @@ function from(collection: string) {
               if (field === 'id' || field === '_id') {
                 await fetch(`${API_BASE}/api/${collection}/${value}`, {
                   method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: getHeaders(),
                   body: JSON.stringify(payload),
                 });
                 resolve({ data: [{ ...payload, id: value }], error: null });
                 return;
               }
 
-              const res = await fetch(`${API_BASE}/api/${collection}?${field}=${encodeURIComponent(value)}`);
+              const res = await fetch(`${API_BASE}/api/${collection}?${field}=${encodeURIComponent(value)}`, {
+                headers: getHeaders()
+              });
               const docs = await jsonResponse(res);
 
               for (const doc of docs) {
                 const id = doc._id || doc.id;
                 await fetch(`${API_BASE}/api/${collection}/${id}`, {
                   method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: getHeaders(),
                   body: JSON.stringify({ ...doc, ...payload }),
                 });
               }
@@ -157,13 +167,13 @@ function from(collection: string) {
           if (id) {
             await fetch(`${API_BASE}/api/${collection}/${id}`, {
               method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
+              headers: getHeaders(),
               body: JSON.stringify(item),
             });
           } else {
             await fetch(`${API_BASE}/api/${collection}`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: getHeaders(),
               body: JSON.stringify(item),
             });
           }
@@ -177,7 +187,7 @@ function from(collection: string) {
       (async () => {
         try {
           const url = buildUrl();
-          const res = await fetch(url);
+          const res = await fetch(url, { headers: getHeaders() });
           let data = await jsonResponse(res);
 
           if (orderField) {

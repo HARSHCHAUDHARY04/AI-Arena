@@ -238,12 +238,18 @@ export default function Dashboard() {
         // Fetch leaderboard for qualification status
         if (newTeam && (newEvent?.id || newEvent?._id || activeEvent?.id || activeEvent?._id)) {
           try {
-            const leaderboardRes = await fetch(`${API_BASE}/api/tournament/leaderboard?event_id=${newEvent?.id || newEvent?._id || activeEvent?.id || activeEvent?._id}`);
+            const token = localStorage.getItem('ai_arena_token');
+            const leaderboardRes = await fetch(`${API_BASE}/api/tournament/leaderboard?event_id=${newEvent?.id || newEvent?._id || activeEvent?.id || activeEvent?._id}`, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {}
+            });
             if (leaderboardRes.ok) {
               const leaderboard = await leaderboardRes.json();
-              const myEntry = leaderboard.find((e: any) => e.team_id === (newTeam.id || newTeam._id));
-              if (myEntry) {
-                setQualificationStatus(myEntry.status === 'eliminated' ? 'Eliminated' : 'Qualified');
+              // Check if leaderboard is an array (public) or object (hidden)
+              if (Array.isArray(leaderboard)) {
+                const myEntry = leaderboard.find((e: any) => e.team_id === (newTeam.id || newTeam._id));
+                if (myEntry) {
+                  setQualificationStatus(myEntry.status === 'eliminated' ? 'Eliminated' : 'Qualified');
+                }
               }
             }
           } catch (err) {

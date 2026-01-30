@@ -5,7 +5,9 @@ import {
   Trophy,
   Crown,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Lock,
+  Users
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -28,13 +30,15 @@ interface LiveScoreboardProps {
 
 export function LiveScoreboard({ eventId, limit = 10 }: LiveScoreboardProps) {
   const [scores, setScores] = useState<LeaderboardEntry[]>([]);
+  const [totalTeams, setTotalTeams] = useState(0);
+  const [isHidden, setIsHidden] = useState(false);
   const [loading, setLoading] = useState(true);
   const [currentEventId, setCurrentEventId] = useState<string | undefined>(eventId);
 
   useEffect(() => {
     const initialize = async () => {
       let targetEventId = eventId;
-      
+
       if (!targetEventId) {
         try {
           const res = await fetch(`${API_BASE}/api/events`);
@@ -52,7 +56,7 @@ export function LiveScoreboard({ eventId, limit = 10 }: LiveScoreboardProps) {
       }
 
       setCurrentEventId(targetEventId);
-      
+
       if (targetEventId) {
         fetchScores(targetEventId);
       } else {
@@ -65,17 +69,28 @@ export function LiveScoreboard({ eventId, limit = 10 }: LiveScoreboardProps) {
 
   useEffect(() => {
     if (!currentEventId) return;
-    
+
     const intervalId = setInterval(() => fetchScores(currentEventId), 10000);
     return () => clearInterval(intervalId);
   }, [currentEventId]);
 
   const fetchScores = async (id: string) => {
     try {
-      const res = await fetch(`${API_BASE}/api/tournament/leaderboard?event_id=${id}`);
+      const token = localStorage.getItem('ai_arena_token');
+      const res = await fetch(`${API_BASE}/api/tournament/leaderboard?event_id=${id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       if (res.ok) {
         const data = await res.json();
-        setScores(data.slice(0, limit));
+        if (data.hidden) {
+          setIsHidden(true);
+          setScores([]);
+          setTotalTeams(0);
+        } else {
+          setIsHidden(false);
+          setTotalTeams(data.length);
+          setScores(data.slice(0, limit));
+        }
       }
     } catch (error) {
       console.error('Error fetching scores:', error);
@@ -102,16 +117,26 @@ export function LiveScoreboard({ eventId, limit = 10 }: LiveScoreboardProps) {
 
   return (
     <div className="glass-card p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-accent/10">
             <Crown className="h-5 w-5 text-accent" />
           </div>
-          <h2 className="font-display font-bold text-xl">Tournament Standings</h2>
+          <div>
+            <h2 className="font-display font-bold text-xl">Tournament Standings</h2>
+            {!isHidden && totalTeams > 0 && (
+              <div className="flex items-center gap-2 mt-1">
+                <Users className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground font-medium">
+                  {totalTeams} {totalTeams === 1 ? 'Team' : 'Teams'} Participating
+                </span>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-success">
+        <div className="flex items-center gap-2 text-xs text-success bg-success/5 border border-success/20 px-3 py-1 rounded-full w-fit">
           <TrendingUp className="h-3 w-3" />
-          Live
+          <span className="font-bold uppercase tracking-wider">Live</span>
         </div>
       </div>
 
@@ -127,7 +152,21 @@ export function LiveScoreboard({ eventId, limit = 10 }: LiveScoreboardProps) {
             </tr>
           </thead>
           <tbody>
-            {scores.length === 0 ? (
+            {isHidden ? (
+              <tr>
+                <td colSpan={5} className="text-center py-12 text-muted-foreground">
+                  <div className="flex flex-col items-center justify-center gap-4">
+                    <div className="p-4 rounded-full bg-warning/10">
+                      <Lock className="h-8 w-8 text-warning animate-pulse" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-lg font-bold text-foreground">Results Awaiting Approval</p>
+                      <p className="text-sm">The official scoreboard will be revealed shortly.</p>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            ) : scores.length === 0 ? (
               <tr>
                 <td colSpan={5} className="text-center py-8 text-muted-foreground">
                   <div className="flex flex-col items-center justify-center gap-2">

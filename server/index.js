@@ -42,6 +42,7 @@ async function ensureSingleEvent() {
       api_contract: "POST /aibattle",
       status: "active",
       submissions_locked: false,
+      scoreboard_approved: false, // Default hidden
       created_at: new Date(),
       is_system_event: true,
     });
@@ -56,6 +57,23 @@ async function main() {
   db = client.db(DB_NAME);
   console.log("Connected to MongoDB", MONGODB_URI);
   await ensureSingleEvent();
+}
+
+// Auth Helper
+async function getUserRole(req) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return "participant";
+
+  try {
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const userRole = await db
+      .collection("user_roles")
+      .findOne({ user_id: decoded.sub });
+    return userRole?.role || "participant";
+  } catch (err) {
+    return "participant";
+  }
 }
 
 // Auth: login
@@ -1017,11 +1035,47 @@ app.get("/api/tournament/leaderboard", async (req, res) => {
   if (!event_id) return res.status(400).json({ error: "event_id required" });
 
   try {
+    // Check scoreboard visibility
+    const event = await db
+      .collection("events")
+      .findOne({ _id: new ObjectId(event_id) });
+    const isApproved = event?.scoreboard_approved || false;
+
+    // Check auth
+    const role = await getUserRole(req);
+    const isAdmin = role === "admin" || role === "organizer";
+
+    if (!isApproved && !isAdmin) {
+      return res.json({ hidden: true, message: "Scoreboard awaiting approval" });
+    }
+
     const leaderboard = await tournamentService.getLeaderboard(db, event_id);
     res.json(leaderboard);
   } catch (err) {
     console.error("Get leaderboard error:", err);
     res.status(500).json({ error: "Failed to get leaderboard" });
+  }
+});
+
+// Toggle scoreboard visibility
+app.post("/api/events/:id/toggle-scoreboard", async (req, res) => {
+  const { id } = req.params;
+  const { approved } = req.body;
+
+  try {
+    const role = await getUserRole(req);
+    if (role !== "admin") {
+      return res.status(403).json({ error: "Only admins can toggle scoreboard" });
+    }
+
+    await db
+      .collection("events")
+      .updateOne({ _id: new ObjectId(id) }, { $set: { scoreboard_approved: !!approved } });
+
+    res.json({ success: true, scoreboard_approved: !!approved });
+  } catch (err) {
+    console.error("Toggle scoreboard error:", err);
+    res.status(500).json({ error: "Failed to toggle scoreboard" });
   }
 });
 

@@ -7,7 +7,9 @@ import {
     TrendingUp,
     AlertCircle,
     Swords,
-    History
+    History,
+    Lock,
+    Eye
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { API_BASE } from '@/integrations/mongo/client';
@@ -46,6 +48,7 @@ export function TournamentParticipantView({
     teamName
 }: TournamentParticipantViewProps) {
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+    const [isHidden, setIsHidden] = useState(false);
     const [loading, setLoading] = useState(true);
     const [myRank, setMyRank] = useState<number>(0);
     const [myMatch, setMyMatch] = useState<any | null>(null);
@@ -54,18 +57,26 @@ export function TournamentParticipantView({
 
     const fetchLeaderboard = useCallback(async () => {
         try {
+            const token = localStorage.getItem('ai_arena_token');
             const res = await fetch(
-                `${API_BASE}/api/tournament/leaderboard?event_id=${eventId}`
+                `${API_BASE}/api/tournament/leaderboard?event_id=${eventId}`,
+                { headers: token ? { Authorization: `Bearer ${token}` } : {} }
             );
             if (res.ok) {
                 const data = await res.json();
-                setLeaderboard(data);
+                if (data.hidden) {
+                    setIsHidden(true);
+                    setLeaderboard([]);
+                } else {
+                    setIsHidden(false);
+                    setLeaderboard(data);
 
-                // Find user's rank
-                const rank = data.findIndex((entry: LeaderboardEntry) =>
-                    entry.team_id === teamId
-                );
-                setMyRank(rank + 1); // Convert to 1-indexed
+                    // Find user's rank
+                    const rank = data.findIndex((entry: LeaderboardEntry) =>
+                        entry.team_id === teamId
+                    );
+                    setMyRank(rank + 1); // Convert to 1-indexed
+                }
             }
         } catch (error) {
             console.error('Failed to fetch leaderboard:', error);
@@ -136,6 +147,28 @@ export function TournamentParticipantView({
         return (
             <div className="flex items-center justify-center p-12">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    if (isHidden) {
+        return (
+            <div className="glass-card p-12 text-center">
+                <div className="flex flex-col items-center justify-center gap-6">
+                    <div className="p-6 rounded-full bg-warning/10 border border-warning/20">
+                        <Lock className="h-12 w-12 text-warning animate-pulse" />
+                    </div>
+                    <div className="space-y-2">
+                        <h3 className="font-display font-bold text-2xl text-foreground">Scoreboard Awaiting Approval</h3>
+                        <p className="text-muted-foreground max-w-sm mx-auto">
+                            The final standings and pairings are currently being reviewed by the tournament organizers.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 px-4 py-2 rounded-full">
+                        <Eye className="h-4 w-4" />
+                        <span>Visible only to organizers</span>
+                    </div>
+                </div>
             </div>
         );
     }
@@ -277,7 +310,7 @@ export function TournamentParticipantView({
 
                     <div className="space-y-3">
                         {history.map((round) => (
-                            <motion.div 
+                            <motion.div
                                 key={round.round}
                                 initial={{ opacity: 0, x: -10 }}
                                 animate={{ opacity: 1, x: 0 }}
@@ -293,11 +326,11 @@ export function TournamentParticipantView({
                                         </p>
                                     </div>
                                 </div>
-                                
+
                                 <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
                                     <Badge variant={
-                                        round.result === 'win' ? 'default' : 
-                                        round.result === 'loss' ? 'destructive' : 'secondary'
+                                        round.result === 'win' ? 'default' :
+                                            round.result === 'loss' ? 'destructive' : 'secondary'
                                     } className={
                                         round.result === 'win' ? 'bg-success hover:bg-success/80' : ''
                                     }>

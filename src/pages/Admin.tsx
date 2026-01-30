@@ -29,7 +29,9 @@ import {
   BarChart3,
   Timer,
   AlertCircle,
-  FlaskConical
+  FlaskConical,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { AdminEvaluationPanel } from '@/components/AdminEvaluationPanel';
 import { TournamentAdminPanel } from '@/components/TournamentAdminPanel';
@@ -46,6 +48,7 @@ interface Event {
   start_time: string | null;
   end_time: string | null;
   submissions_locked: boolean;
+  scoreboard_approved: boolean;
   created_at: string;
 }
 
@@ -63,6 +66,8 @@ export default function AdminDashboard() {
   const [rounds, setRounds] = useState<any[]>([]);
   const [loadingRounds, setLoadingRounds] = useState(false);
   const [creatingRound, setCreatingRound] = useState(false);
+  const [togglingScoreboard, setTogglingScoreboard] = useState(false);
+  const [togglingSubmissions, setTogglingSubmissions] = useState(false);
   const [newRound, setNewRound] = useState({ number: 1, title: '', dataset_name: '', dataset_description: '', problem_statement: '', evaluation_criteria: '' });
 
   // Form state
@@ -117,8 +122,15 @@ export default function AdminDashboard() {
       if (res.ok) {
         const data = await res.json();
         setEvents(data || []);
-        if (data && data.length > 0 && !selectedEvent) {
-          setSelectedEvent(data[0]);
+
+        // Update selected event if one exists, otherwise pick the first one
+        if (data && data.length > 0) {
+          if (selectedEvent) {
+            const updated = data.find((e: Event) => (e._id || e.id) === (selectedEvent._id || selectedEvent.id));
+            if (updated) setSelectedEvent(updated);
+          } else {
+            setSelectedEvent(data[0]);
+          }
         }
       }
     } catch (error) {
@@ -252,6 +264,7 @@ export default function AdminDashboard() {
 
   const toggleSubmissions = async (eventId: string, locked: boolean) => {
     try {
+      setTogglingSubmissions(true);
       const { error } = await db
         .from('events')
         .update({ submissions_locked: locked })
@@ -265,9 +278,45 @@ export default function AdminDashboard() {
           ? 'Teams can no longer submit or update APIs'
           : 'Teams can now submit APIs',
       });
-      fetchEvents();
+      await fetchEvents();
     } catch (error) {
       console.error('Error toggling submissions:', error);
+    } finally {
+      setTogglingSubmissions(false);
+    }
+  };
+
+  const toggleScoreboard = async (eventId: string, approved: boolean) => {
+    try {
+      setTogglingScoreboard(true);
+      const token = localStorage.getItem('ai_arena_token');
+      const res = await fetch(`${API_BASE}/api/events/${eventId}/toggle-scoreboard`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ approved })
+      });
+
+      if (!res.ok) throw new Error('Failed to toggle scoreboard');
+
+      toast({
+        title: approved ? 'Scoreboard Public' : 'Scoreboard Hidden',
+        description: approved
+          ? 'Participants can now see the live leaderboard'
+          : 'Scoreboard is now hidden from participants',
+      });
+      await fetchEvents();
+    } catch (error) {
+      console.error('Error toggling scoreboard:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update scoreboard visibility',
+        variant: 'destructive'
+      });
+    } finally {
+      setTogglingScoreboard(false);
     }
   };
 
@@ -389,11 +438,33 @@ export default function AdminDashboard() {
                     <div className="flex items-center gap-2">
                       <Button
                         size="sm"
+                        disabled={togglingSubmissions}
                         variant={selectedEvent.submissions_locked ? 'destructive' : 'outline'}
                         onClick={() => toggleSubmissions(selectedEvent.id, !selectedEvent.submissions_locked)}
                       >
-                        {selectedEvent.submissions_locked ? <Lock className="h-4 w-4 mr-2" /> : <Unlock className="h-4 w-4 mr-2" />}
+                        {togglingSubmissions ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : selectedEvent.submissions_locked ? (
+                          <Lock className="h-4 w-4 mr-2" />
+                        ) : (
+                          <Unlock className="h-4 w-4 mr-2" />
+                        )}
                         {selectedEvent.submissions_locked ? 'Submissions Locked' : 'Submissions Open'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={togglingScoreboard}
+                        variant={selectedEvent.scoreboard_approved ? 'success' : 'outline'}
+                        onClick={() => toggleScoreboard(selectedEvent._id || selectedEvent.id || '', !selectedEvent.scoreboard_approved)}
+                      >
+                        {togglingScoreboard ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : selectedEvent.scoreboard_approved ? (
+                          <Eye className="h-4 w-4 mr-2" />
+                        ) : (
+                          <EyeOff className="h-4 w-4 mr-2" />
+                        )}
+                        {selectedEvent.scoreboard_approved ? 'Scoreboard Visible' : 'Scoreboard Hidden'}
                       </Button>
                     </div>
                   </div>
