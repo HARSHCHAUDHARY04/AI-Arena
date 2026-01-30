@@ -1,7 +1,7 @@
 const { MongoClient } = require('mongodb');
 
 async function run() {
-    const client = new MongoClient('mongodb+srv://harshchikara:Harsh123@cluster0.fuxeoxz.mongodb.net/');
+    const client = MONGODB_URI;
     try {
         await client.connect();
         const db = client.db('ai_arena');
