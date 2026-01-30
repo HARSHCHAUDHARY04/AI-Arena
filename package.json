@@ -7,6 +7,7 @@
     "dev": "vite",
     "import": "node server/import_users.js",
     "build": "vite build",
+    "add-teams": "node server/add_demo_teams.js",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview"

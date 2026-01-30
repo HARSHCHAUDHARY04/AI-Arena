@@ -27,11 +27,14 @@ import {
   Award,
   FlaskConical,
   Key,
+  Swords,
 } from 'lucide-react';
 import { ApiTestSection } from '@/components/ApiTestSection';
+import { TournamentParticipantView } from '@/components/TournamentParticipantView';
 
 interface Event {
   id: string;
+  _id?: string;
   title: string;
   description: string | null;
   problem_statement: string | null;
@@ -71,7 +74,7 @@ export default function Dashboard() {
   const [qualificationStatus, setQualificationStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'submit' | 'scoreboard' | 'test' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'submit' | 'scoreboard' | 'test' | 'settings' | 'tournament'>('overview');
 
   // Settings Tab State
   const [oldPassword, setOldPassword] = useState('');
@@ -160,7 +163,11 @@ export default function Dashboard() {
         if (eventRes.ok) {
           const events = await eventRes.json();
           if (events && events.length > 0) {
-            newEvent = events[0];
+            const event = events[0];
+            newEvent = {
+              ...event,
+              id: event.id || event._id || event._id?.toString?.()
+            };
           }
         }
       } catch (err) {
@@ -179,7 +186,10 @@ export default function Dashboard() {
 
             if (teamMembersResp && teamMembersResp.length > 0) {
               // Strict Check: Filter specifically for the logged in user
-              const teamMembership = teamMembersResp.find((m: any) => m.user_id === user.id);
+              // Use String() conversion to be sure about comparison
+              const teamMembership = teamMembersResp.find((m: any) =>
+                String(m.user_id) === String(user.id || user._id)
+              );
 
               if (teamMembership) {
                 const teamRes = await fetch(`${API_BASE}/api/teams/${teamMembership.team_id}`);
@@ -210,18 +220,47 @@ export default function Dashboard() {
         } catch (err) {
           console.error('Error fetching team data:', err);
         }
-      }
+        // Fetch tournament rounds
+        try {
+          const roundsRes = await fetch(`${API_BASE}/api/tournament/rounds?event_id=${newEvent?.id || newEvent?._id || activeEvent?.id || activeEvent?._id}`);
+          if (roundsRes.ok) {
+            const rounds = await roundsRes.json();
+            // Find the active round (running) or the next pending one
+            const active = rounds.find((r: any) => r.status === 'running') ||
+              rounds.find((r: any) => r.status === 'pending') ||
+              rounds[rounds.length - 1];
+            setCurrentRound(active ? { number: active.round_number, status: active.status, title: `Round ${active.round_number}` } : null);
+          }
+        } catch (err) {
+          console.error('Error fetching tournament rounds:', err);
+        }
 
-      // Compare new data with current state to avoid re-renders
-      const currentDataString = JSON.stringify({ event: newEvent, team: newTeam, members: newMembers });
-      if (currentDataString !== lastDataRef.current) {
-        console.log('Dashboard data updated');
-        setActiveEvent(newEvent);
-        setUserTeam(newTeam);
-        setTeamMembers(newMembers);
-        lastDataRef.current = currentDataString;
-      }
+        // Fetch leaderboard for qualification status
+        if (newTeam && (newEvent?.id || newEvent?._id || activeEvent?.id || activeEvent?._id)) {
+          try {
+            const leaderboardRes = await fetch(`${API_BASE}/api/tournament/leaderboard?event_id=${newEvent?.id || newEvent?._id || activeEvent?.id || activeEvent?._id}`);
+            if (leaderboardRes.ok) {
+              const leaderboard = await leaderboardRes.json();
+              const myEntry = leaderboard.find((e: any) => e.team_id === (newTeam.id || newTeam._id));
+              if (myEntry) {
+                setQualificationStatus(myEntry.status === 'eliminated' ? 'Eliminated' : 'Qualified');
+              }
+            }
+          } catch (err) {
+            console.error('Error fetching leaderboard for status:', err);
+          }
+        }
 
+        // Compare new data with current state to avoid re-renders
+        const currentDataString = JSON.stringify({ event: newEvent, team: newTeam, members: newMembers });
+        if (currentDataString !== lastDataRef.current) {
+          console.log('Dashboard data updated');
+          setActiveEvent(newEvent);
+          setUserTeam(newTeam);
+          setTeamMembers(newMembers);
+          lastDataRef.current = currentDataString;
+        }
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
       // Only set error if we don't have partial data to show
@@ -259,6 +298,7 @@ export default function Dashboard() {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: FileText },
+    { id: 'tournament', label: 'Tournament', icon: Swords },
     { id: 'test', label: 'Test API', icon: FlaskConical },
     { id: 'submit', label: 'Submit API', icon: Code2 },
     { id: 'scoreboard', label: 'Scoreboard', icon: Trophy },
@@ -407,7 +447,8 @@ export default function Dashboard() {
                   <TeamDetailSection team={userTeam} members={teamMembers} />
                 )}
 
-                {/* Event Rules moved to full-width section below */}
+
+                {/* Tournament Status moved to dedicated tab */}
               </div>
 
               <div className="space-y-6">
@@ -458,6 +499,34 @@ export default function Dashboard() {
           </ErrorBoundary>
         )}
 
+        {activeTab === 'tournament' && (
+          <ErrorBoundary name="Tournament Tab">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-4xl mx-auto"
+            >
+              {(userTeam && (userTeam.id || userTeam._id)) && (activeEvent && (activeEvent.id || activeEvent._id)) ? (
+                <TournamentParticipantView
+                  teamId={userTeam.id || userTeam._id}
+                  eventId={activeEvent.id || activeEvent._id}
+                  teamName={userTeam.name}
+                />
+              ) : (
+                <div className="glass-card p-12 text-center">
+                  <Trophy className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <h3 className="font-display font-semibold text-lg mb-2">
+                    {!userTeam ? 'Join a Team First' : 'No Active Event'}
+                  </h3>
+                  <p className="text-muted-foreground">
+                    Participate in the tournament to see your progress here.
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          </ErrorBoundary>
+        )}
+
         {activeTab === 'test' && (
           <ErrorBoundary name="Test Tab">
             <ApiTestSection />
@@ -472,10 +541,10 @@ export default function Dashboard() {
               className="grid grid-cols-1 lg:grid-cols-3 gap-6"
             >
               <div className="lg:col-span-2">
-                {userTeam && activeEvent && userTeam.id ? (
+                {(userTeam && (userTeam.id || userTeam._id)) && (activeEvent && (activeEvent.id || activeEvent._id)) ? (
                   <ApiSubmissionForm
-                    teamId={userTeam.id}
-                    eventId={activeEvent.id}
+                    teamId={userTeam.id || userTeam._id}
+                    eventId={activeEvent.id || activeEvent._id}
                     isLocked={activeEvent.submissions_locked}
                   />
                 ) : (
@@ -515,10 +584,10 @@ export default function Dashboard() {
             >
               {activeEvent && (
                 <>
-                  <ErrorBoundary name="Leaderboard Graph">
-                    <LeaderboardGraph eventId={activeEvent.id} />
-                  </ErrorBoundary>
-                  <LiveScoreboard eventId={activeEvent.id} limit={20} />
+                  {/* <ErrorBoundary name="Leaderboard Graph">
+                    <LeaderboardGraph eventId={activeEvent.id || activeEvent._id} />
+                  </ErrorBoundary> */}
+                  <LiveScoreboard eventId={activeEvent.id || activeEvent._id} limit={20} />
                 </>
               )}
             </motion.div>

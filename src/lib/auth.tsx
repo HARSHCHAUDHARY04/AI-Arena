@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 
-type User = { id: string; email: string; role?: UserRole };
+type User = { id: string; _id?: string; email: string; role?: UserRole };
 type Session = { user: User; access_token: string };
 import db from '@/integrations/mongo/client';
 
@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('Initial session:', session);
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
         let userRole = session.user.role as UserRole | undefined;
         if (!userRole) {
@@ -77,10 +77,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
     });
-    
+
     const error = (result as any).error ?? null;
     const data = (result as any).data;
-    
+
     // If login successful, immediately update state from returned data
     if (!error && data?.user) {
       const loggedInUser = data.user as User;
@@ -93,14 +93,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession({ user: loggedInUser, access_token: data.token });
       setLoading(false);
     }
-    
+
     // Normalise error into an Error instance for callers
     const normalisedError =
       error instanceof Error
         ? error
         : error && typeof error === 'object'
-        ? new Error((error as any).error || 'Login failed')
-        : null;
+          ? new Error((error as any).error || 'Login failed')
+          : null;
 
     return {
       error: normalisedError,

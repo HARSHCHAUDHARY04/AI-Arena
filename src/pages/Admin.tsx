@@ -32,9 +32,11 @@ import {
   FlaskConical
 } from 'lucide-react';
 import { AdminEvaluationPanel } from '@/components/AdminEvaluationPanel';
+import { TournamentAdminPanel } from '@/components/TournamentAdminPanel';
 
 interface Event {
-  id: string;
+  _id: string;
+  id?: string;
   title: string;
   description: string | null;
   problem_statement: string | null;
@@ -56,7 +58,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'teams' | 'timer' | 'evaluation'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'teams' | 'tournament' | 'timer' | 'evaluation'>('overview');
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [rounds, setRounds] = useState<any[]>([]);
   const [loadingRounds, setLoadingRounds] = useState(false);
@@ -91,13 +93,13 @@ export default function AdminDashboard() {
   }, [user, role]);
 
   useEffect(() => {
-    if (selectedEvent) fetchRounds(selectedEvent.id);
+    if (selectedEvent) fetchRounds(selectedEvent._id || selectedEvent.id || '');
   }, [selectedEvent]);
 
   const fetchRounds = async (eventId: string) => {
     setLoadingRounds(true);
     try {
-      const res = await fetch(`${API_BASE}/api/rounds?event_id=${eventId}`);
+      const res = await fetch(`${API_BASE}/api/tournament/rounds?event_id=${eventId}`);
       if (res.ok) {
         const data = await res.json();
         setRounds(data || []);
@@ -170,7 +172,7 @@ export default function AdminDashboard() {
 
     try {
       const payload = {
-        event_id: selectedEvent.id,
+        event_id: selectedEvent._id || selectedEvent.id,
         number: nextRoundNum,
         title: isFinal ? 'Final Round' : `Round ${nextRoundNum}`,
         dataset_name: newRound.dataset_name,
@@ -191,7 +193,7 @@ export default function AdminDashboard() {
       if (error) throw error;
 
       setNewRound({ number: nextRoundNum + 1, title: '', dataset_name: '', dataset_description: '', problem_statement: '', evaluation_criteria: '' });
-      fetchRounds(selectedEvent.id);
+      fetchRounds(selectedEvent._id || selectedEvent.id || '');
       toast({ title: 'Round Created', description: `${payload.title} created and dataset locked.` });
     } catch (err) {
       console.error('Error creating round', err);
@@ -206,7 +208,7 @@ export default function AdminDashboard() {
       const { error } = await db.from('rounds').update({ status }).eq('id', roundId);
       if (error) throw error;
       toast({ title: 'Round Updated', description: `Round status set to ${status}` });
-      if (selectedEvent) fetchRounds(selectedEvent.id);
+      if (selectedEvent) fetchRounds(selectedEvent._id || selectedEvent.id || '');
     } catch (err) {
       console.error('Error updating round status', err);
       toast({ title: 'Error', description: 'Failed to update round', variant: 'destructive' });
@@ -218,7 +220,7 @@ export default function AdminDashboard() {
       const { error } = await db.from('rounds').update({ submissions_locked: locked }).eq('id', roundId);
       if (error) throw error;
       toast({ title: locked ? 'Locked' : 'Unlocked', description: 'Round submissions updated' });
-      if (selectedEvent) fetchRounds(selectedEvent.id);
+      if (selectedEvent) fetchRounds(selectedEvent._id || selectedEvent.id || '');
     } catch (err) {
       console.error('Error toggling round lock', err);
     }
@@ -229,7 +231,7 @@ export default function AdminDashboard() {
       const { error } = await db.from('rounds').update({ status: 'completed' }).eq('id', roundId);
       if (error) throw error;
       toast({ title: 'Evaluation Triggered', description: 'Round marked complete. Evaluation should run.' });
-      if (selectedEvent) fetchRounds(selectedEvent.id);
+      if (selectedEvent) fetchRounds(selectedEvent._id || selectedEvent.id || '');
     } catch (err) {
       console.error('Error triggering evaluation', err);
       toast({ title: 'Error', description: 'Failed to trigger evaluation', variant: 'destructive' });
@@ -306,6 +308,7 @@ export default function AdminDashboard() {
     { id: 'overview', label: 'Analytics', icon: BarChart3 },
     { id: 'events', label: 'Events', icon: Calendar },
     { id: 'teams', label: 'Teams & Shortlist', icon: Users },
+    { id: 'tournament', label: 'Tournament', icon: Trophy },
     { id: 'evaluation', label: 'Evaluation', icon: FlaskConical },
     { id: 'timer', label: 'Timer Control', icon: Timer },
   ];
@@ -352,7 +355,7 @@ export default function AdminDashboard() {
               Performance Analytics
             </h2>
             {selectedEvent ? (
-              <AdminAnalytics eventId={selectedEvent.id} />
+              <AdminAnalytics />
             ) : (
               <div className="glass-card p-12 text-center">
                 <p className="text-muted-foreground">Loading analytics...</p>
@@ -362,9 +365,9 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === 'events' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="space-y-6">
             {/* Single Event Permanent Card */}
-            <div className="lg:col-span-2 space-y-4">
+            <div className="space-y-4">
               <h2 className="font-display font-bold text-xl flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
                 Current Event
@@ -460,103 +463,6 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
-
-            {/* Sidebar: Rounds Management */}
-            <div className="space-y-6">
-              {selectedEvent && (
-                <div className="glass-card p-4">
-                  <h3 className="font-display font-bold text-lg mb-3">Rounds for {selectedEvent.title}</h3>
-
-                  <div className="space-y-3 mb-6 max-h-[300px] overflow-y-auto custom-scrollbar">
-                    {loadingRounds ? (
-                      <div className="text-sm text-muted-foreground">Loading rounds...</div>
-                    ) : rounds.length === 0 ? (
-                      <div className="text-sm text-muted-foreground italic">No rounds created yet.</div>
-                    ) : (
-                      rounds.map((r) => (
-                        <div key={r.id} className={`p-3 rounded-lg border text-sm ${r.status === 'live' ? 'border-primary/50 bg-primary/5' : 'border-border/50 bg-muted/10'}`}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-bold">Round {r.number}</span>
-                            <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded ${r.status === 'live' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                              {r.status}
-                            </span>
-                          </div>
-                          <p className="text-xs truncate mb-2">{r.title}</p>
-
-                          <div className="flex items-center justify-end gap-1">
-                            {r.status === 'upcoming' && (
-                              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateRoundStatus(r.id, 'live')} title="Start Round">
-                                <Play className="h-3 w-3 text-success" />
-                              </Button>
-                            )}
-                            {r.status === 'live' && (
-                              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateRoundStatus(r.id, 'completed')} title="End Round">
-                                <Square className="h-3 w-3 text-destructive" />
-                              </Button>
-                            )}
-                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => toggleRoundLock(r.id, !r.submissions_locked)} title={r.submissions_locked ? 'Unlock Submissions' : 'Lock Submissions'}>
-                              {r.submissions_locked ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
-                            </Button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {/* Add New Round Form */}
-                  <div className="border-t border-border/50 pt-4">
-                    <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                      <Plus className="h-4 w-4" /> Add Next Round
-                    </h4>
-                    <form onSubmit={handleCreateRound} className="space-y-3">
-                      <div>
-                        <Label className="text-xs">Dataset Name</Label>
-                        <Input
-                          value={newRound.dataset_name}
-                          onChange={e => setNewRound({ ...newRound, dataset_name: e.target.value })}
-                          placeholder="e.g. Finance_Corpus_v1"
-                          className="h-8 text-xs"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">Dataset Description</Label>
-                        <Input
-                          value={newRound.dataset_description}
-                          onChange={e => setNewRound({ ...newRound, dataset_description: e.target.value })}
-                          placeholder="Short description"
-                          className="h-8 text-xs"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">PDF URL (Input)</Label>
-                        <Input
-                          value={newRound.problem_statement}
-                          onChange={e => setNewRound({ ...newRound, problem_statement: e.target.value })}
-                          placeholder="https://..."
-                          className="h-8 text-xs font-mono"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">Questions (One per line)</Label>
-                        <Textarea
-                          value={newRound.evaluation_criteria}
-                          onChange={e => setNewRound({ ...newRound, evaluation_criteria: e.target.value })}
-                          placeholder="Q1..."
-                          className="text-xs min-h-[80px]"
-                          required
-                        />
-                      </div>
-                      <Button type="submit" disabled={creatingRound} className="w-full h-8 text-xs">
-                        {creatingRound ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create & Lock Dataset'}
-                      </Button>
-                    </form>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         )}
 
@@ -570,8 +476,12 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {activeTab === 'tournament' && selectedEvent && (
+          <TournamentAdminPanel eventId={selectedEvent._id || selectedEvent.id || ''} />
+        )}
+
         {activeTab === 'evaluation' && selectedEvent && (
-          <AdminEvaluationPanel eventId={selectedEvent.id} />
+          <AdminEvaluationPanel eventId={selectedEvent._id || selectedEvent.id || ''} />
         )}
 
         {activeTab === 'timer' && selectedEvent && (

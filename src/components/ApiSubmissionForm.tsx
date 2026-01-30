@@ -1,21 +1,11 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
-import db, { API_BASE } from '@/integrations/mongo/client';
-import {
-  Send,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  Clock,
-  Zap,
-  AlertTriangle,
-  Play,
-  Trophy
-} from 'lucide-react';
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import db, { API_BASE } from "@/integrations/mongo/client";
+import { Send, Loader2, Zap, AlertTriangle, Play, Trophy } from "lucide-react";
 
 type Json = any;
 
@@ -25,13 +15,6 @@ interface ApiSubmissionFormProps {
   currentEndpoint?: string;
   isLocked?: boolean;
   onSubmit?: () => void;
-}
-
-interface TestResult {
-  success: boolean;
-  response?: unknown;
-  latency?: number;
-  error?: string;
 }
 
 interface EvaluationScores {
@@ -50,16 +33,16 @@ interface EvaluationScores {
 export function ApiSubmissionForm({
   teamId,
   eventId,
-  currentEndpoint = '',
+  currentEndpoint = "",
   isLocked = false,
-  onSubmit
+  onSubmit,
 }: ApiSubmissionFormProps) {
   const [endpoint, setEndpoint] = useState(currentEndpoint);
   const [loading, setLoading] = useState(false);
-  const [testing, setTesting] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
-  const [testResult, setTestResult] = useState<TestResult | null>(null);
-  const [evaluationScores, setEvaluationScores] = useState<EvaluationScores | null>(null);
+  const [evaluationScores, setEvaluationScores] =
+    useState<EvaluationScores | null>(null);
+  const [isSubmitted, setIsSubmitted] = useState(!!currentEndpoint);
   const { toast } = useToast();
 
   const validateEndpoint = (url: string): boolean => {
@@ -71,86 +54,12 @@ export function ApiSubmissionForm({
     }
   };
 
-  const handleTest = async () => {
-    if (!validateEndpoint(endpoint)) {
-      toast({
-        title: 'Invalid URL',
-        description: 'Please enter a valid API endpoint URL',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setTesting(true);
-    setTestResult(null);
-
-    const startTime = Date.now();
-
-    try {
-      // Sample test request
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ input: 'test_sample_data' }),
-      });
-
-      const latency = Date.now() - startTime;
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      // Validate response format
-      if (!data.hasOwnProperty('output')) {
-        setTestResult({
-          success: false,
-          error: 'Response must contain "output" field. Expected: { "output": "predicted_result" }',
-          latency,
-        });
-        return;
-      }
-
-      setTestResult({
-        success: true,
-        response: data,
-        latency,
-      });
-
-      toast({
-        title: 'Test Successful!',
-        description: `API responded in ${latency}ms`,
-      });
-    } catch (error) {
-      const latency = Date.now() - startTime;
-      setTestResult({
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to reach endpoint',
-        latency,
-      });
-    } finally {
-      setTesting(false);
-    }
-  };
-
   const handleSubmit = async () => {
     if (!validateEndpoint(endpoint)) {
       toast({
-        title: 'Invalid URL',
-        description: 'Please enter a valid API endpoint URL',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!testResult?.success) {
-      toast({
-        title: 'Test Required',
-        description: 'Please test your API endpoint before submitting',
-        variant: 'destructive',
+        title: "Invalid URL",
+        description: "Please enter a valid API endpoint URL",
+        variant: "destructive",
       });
       return;
     }
@@ -158,63 +67,47 @@ export function ApiSubmissionForm({
     setLoading(true);
 
     try {
-      // Check if submission already exists
-      const { data: existing } = await db
-        .from('api_submissions')
-        .select('id')
-        .eq('team_id', teamId)
-        .eq('event_id', eventId)
-        .single();
-
-      // Convert testResult to Json compatible format
-      const testResultJson: Json = {
-        success: testResult.success,
-        response: testResult.response as Json,
-        latency: testResult.latency ?? null,
-        error: testResult.error ?? null,
-      };
-
-      if (existing) {
-        // Update existing submission
-        const { error } = await db
-          .from('api_submissions')
-          .update({
-            endpoint_url: endpoint,
-            is_validated: true,
-            last_test_at: new Date().toISOString(),
-            last_test_result: testResultJson,
-          })
-          .eq('id', existing.id);
-
-        if (error) throw error;
-      } else {
-        // Create new submission
-        const { error } = await db
-          .from('api_submissions')
-          .insert([{
-            team_id: teamId,
-            event_id: eventId,
-            endpoint_url: endpoint,
-            is_validated: true,
-            last_test_at: new Date().toISOString(),
-            last_test_result: testResultJson,
-          }]);
-
-        if (error) throw error;
-      }
-
-      toast({
-        title: 'API Submitted!',
-        description: 'Your endpoint has been registered for the competition',
+      const apiUrl = API_BASE;
+      const res = await fetch(`${apiUrl}/api/submit-api`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          team_id: teamId,
+          event_id: eventId,
+          endpoint_url: endpoint,
+        }),
       });
 
-      onSubmit?.();
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to submit API endpoint");
+      }
+
+      if (data.success) {
+        const isUpdate = data.action === "updated";
+        toast({
+          title: isUpdate ? "API Updated!" : "API Submitted!",
+          description: isUpdate
+            ? "Your endpoint has been updated. Use Evaluate to test it."
+            : "Your endpoint has been registered. Use Evaluate to test it.",
+        });
+
+        setIsSubmitted(true);
+        setEvaluationScores(null); // Clear previous evaluation scores on new submission
+        onSubmit?.();
+      } else {
+        throw new Error(data.error || "Failed to submit API endpoint");
+      }
     } catch (error) {
-      console.error('Submission error:', error);
+      console.error("Submission error:", error);
       toast({
-        title: 'Submission Failed',
-        description: 'Could not save your API endpoint',
-        variant: 'destructive',
+        title: "Submission Failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Could not save your API endpoint",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -224,9 +117,18 @@ export function ApiSubmissionForm({
   const handleEvaluate = async () => {
     if (!validateEndpoint(endpoint)) {
       toast({
-        title: 'Invalid URL',
-        description: 'Please enter a valid API endpoint URL',
-        variant: 'destructive',
+        title: "Invalid URL",
+        description: "Please enter a valid API endpoint URL",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isSubmitted) {
+      toast({
+        title: "Submit First",
+        description: "Please submit your API endpoint before evaluating",
+        variant: "destructive",
       });
       return;
     }
@@ -237,8 +139,8 @@ export function ApiSubmissionForm({
     try {
       const apiUrl = API_BASE;
       const res = await fetch(`${apiUrl}/api/evaluate-api`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           team_id: teamId,
           event_id: eventId,
@@ -247,23 +149,24 @@ export function ApiSubmissionForm({
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Evaluation failed');
+      if (!res.ok) throw new Error(data.error || "Evaluation failed");
 
       if (data?.success && data?.scores) {
         setEvaluationScores(data.scores);
         toast({
-          title: 'Evaluation Complete!',
+          title: "Evaluation Complete!",
           description: `Total Score: ${data.scores.total_score}/100`,
         });
       } else {
-        throw new Error(data?.error || 'Evaluation failed');
+        throw new Error(data?.error || "Evaluation failed");
       }
     } catch (error) {
-      console.error('Evaluation error:', error);
+      console.error("Evaluation error:", error);
       toast({
-        title: 'Evaluation Failed',
-        description: error instanceof Error ? error.message : 'Could not evaluate API',
-        variant: 'destructive',
+        title: "Evaluation Failed",
+        description:
+          error instanceof Error ? error.message : "Could not evaluate API",
+        variant: "destructive",
       });
     } finally {
       setEvaluating(false);
@@ -293,10 +196,18 @@ export function ApiSubmissionForm({
       <div className="space-y-4">
         {/* API Contract Info */}
         <div className="p-4 rounded-lg bg-muted/30 border border-border/50">
-          <p className="text-sm font-medium text-foreground mb-2">API Contract:</p>
+          <p className="text-sm font-medium text-foreground mb-2">
+            API Contract:
+          </p>
           <div className="font-mono text-xs text-muted-foreground space-y-1">
-            <p><span className="text-primary">Request:</span> {'{ "input": "test_data" }'}</p>
-            <p><span className="text-accent">Response:</span> {'{ "output": "predicted_result" }'}</p>
+            <p>
+              <span className="text-primary">Request:</span>{" "}
+              {'{ "input": "test_data" }'}
+            </p>
+            <p>
+              <span className="text-accent">Response:</span>{" "}
+              {'{ "output": "predicted_result" }'}
+            </p>
           </div>
         </div>
 
@@ -308,61 +219,30 @@ export function ApiSubmissionForm({
             type="url"
             placeholder="https://your-api.com/predict"
             value={endpoint}
-            onChange={(e) => setEndpoint(e.target.value)}
+            onChange={(e) => {
+              setEndpoint(e.target.value);
+              if (e.target.value !== currentEndpoint) {
+                setIsSubmitted(false);
+                setEvaluationScores(null);
+              }
+            }}
             disabled={isLocked}
             className="font-mono"
           />
         </div>
 
-        {/* Test Result */}
-        {testResult && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            className={`p-4 rounded-lg border ${testResult.success
-              ? 'bg-success/10 border-success/30'
-              : 'bg-destructive/10 border-destructive/30'
-              }`}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              {testResult.success ? (
-                <CheckCircle className="h-5 w-5 text-success" />
-              ) : (
-                <XCircle className="h-5 w-5 text-destructive" />
-              )}
-              <span className={`font-medium ${testResult.success ? 'text-success' : 'text-destructive'}`}>
-                {testResult.success ? 'Test Passed' : 'Test Failed'}
-              </span>
-              {testResult.latency && (
-                <span className="ml-auto flex items-center gap-1 text-sm text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  {testResult.latency}ms
-                </span>
-              )}
-            </div>
-
-            {testResult.success && testResult.response && (
-              <pre className="text-xs font-mono bg-background/50 p-2 rounded overflow-x-auto">
-                {JSON.stringify(testResult.response, null, 2)}
-              </pre>
-            )}
-
-            {!testResult.success && testResult.error && (
-              <p className="text-sm text-destructive">{testResult.error}</p>
-            )}
-          </motion.div>
-        )}
-
         {/* Evaluation Scores */}
         {evaluationScores && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
+            animate={{ opacity: 1, height: "auto" }}
             className="p-4 rounded-lg border bg-primary/10 border-primary/30"
           >
             <div className="flex items-center gap-2 mb-4">
               <Trophy className="h-5 w-5 text-primary" />
-              <span className="font-medium text-primary">Evaluation Results</span>
+              <span className="font-medium text-primary">
+                Evaluation Results
+              </span>
               <span className="ml-auto text-lg font-display font-bold text-primary">
                 {evaluationScores.total_score}/100
               </span>
@@ -371,25 +251,35 @@ export function ApiSubmissionForm({
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="p-2 rounded bg-background/50">
                 <p className="text-muted-foreground text-xs">Accuracy</p>
-                <p className="font-semibold">{evaluationScores.accuracy_score}%</p>
+                <p className="font-semibold">
+                  {evaluationScores.accuracy_score}%
+                </p>
               </div>
               <div className="p-2 rounded bg-background/50">
                 <p className="text-muted-foreground text-xs">Latency</p>
-                <p className="font-semibold">{evaluationScores.latency_score}%</p>
+                <p className="font-semibold">
+                  {evaluationScores.latency_score}%
+                </p>
               </div>
               <div className="p-2 rounded bg-background/50">
                 <p className="text-muted-foreground text-xs">Stability</p>
-                <p className="font-semibold">{evaluationScores.stability_score}%</p>
+                <p className="font-semibold">
+                  {evaluationScores.stability_score}%
+                </p>
               </div>
               <div className="p-2 rounded bg-background/50">
                 <p className="text-muted-foreground text-xs">Penalties</p>
-                <p className="font-semibold text-destructive">-{evaluationScores.penalty_points}</p>
+                <p className="font-semibold text-destructive">
+                  -{evaluationScores.penalty_points}
+                </p>
               </div>
             </div>
 
             <div className="mt-3 pt-3 border-t border-border/50 text-xs text-muted-foreground">
-              Tests: {evaluationScores.details.tests_passed}/{evaluationScores.details.tests_passed + evaluationScores.details.tests_failed} passed |
-              Avg latency: {evaluationScores.details.avg_latency_ms}ms
+              Tests: {evaluationScores.details.tests_passed}/
+              {evaluationScores.details.tests_passed +
+                evaluationScores.details.tests_failed}{" "}
+              passed | Avg latency: {evaluationScores.details.avg_latency_ms}ms
             </div>
           </motion.div>
         )}
@@ -397,21 +287,8 @@ export function ApiSubmissionForm({
         {/* Actions */}
         <div className="flex gap-3 flex-wrap">
           <Button
-            variant="outline"
-            onClick={handleTest}
-            disabled={!endpoint || testing || isLocked}
-            className="flex-1 min-w-[120px]"
-          >
-            {testing ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Zap className="h-4 w-4 mr-2" />
-            )}
-            Test API
-          </Button>
-          <Button
             onClick={handleSubmit}
-            disabled={!testResult?.success || loading || isLocked}
+            disabled={!endpoint || loading || isLocked}
             className="flex-1 min-w-[120px]"
           >
             {loading ? (
@@ -419,12 +296,12 @@ export function ApiSubmissionForm({
             ) : (
               <Send className="h-4 w-4 mr-2" />
             )}
-            Submit
+            {isSubmitted ? "Resubmit" : "Submit"}
           </Button>
           <Button
             variant="accent"
             onClick={handleEvaluate}
-            disabled={!testResult?.success || evaluating}
+            disabled={!isSubmitted || evaluating || isLocked}
             className="flex-1 min-w-[120px]"
           >
             {evaluating ? (
@@ -435,6 +312,13 @@ export function ApiSubmissionForm({
             Evaluate
           </Button>
         </div>
+
+        {/* Helper text */}
+        {!isSubmitted && endpoint && (
+          <p className="text-xs text-muted-foreground text-center">
+            Submit your endpoint first, then use Evaluate to test it
+          </p>
+        )}
       </div>
     </motion.div>
   );

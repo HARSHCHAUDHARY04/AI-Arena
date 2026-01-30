@@ -4,10 +4,10 @@ import db from '@/integrations/mongo/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { 
-  Play, 
-  Pause, 
-  RotateCcw, 
+import {
+  Play,
+  Pause,
+  RotateCcw,
   Clock,
   Loader2,
   Save
@@ -15,7 +15,8 @@ import {
 import { toast } from 'sonner';
 
 interface Event {
-  id: string;
+  _id?: string;
+  id?: string;
   title: string;
   status: string;
   start_time: string | null;
@@ -64,7 +65,7 @@ export function AdminEventTimer({ event, onUpdate }: AdminEventTimerProps) {
           start_time: startTime ? new Date(startTime).toISOString() : null,
           end_time: endTime ? new Date(endTime).toISOString() : null,
         })
-        .eq('id', event.id);
+        .eq('id', event._id || event.id);
 
       if (error) throw error;
       toast.success('Timer updated successfully');
@@ -81,7 +82,7 @@ export function AdminEventTimer({ event, onUpdate }: AdminEventTimerProps) {
     setUpdating(true);
     try {
       const updates: Record<string, unknown> = { status };
-      
+
       // If starting the event and no start time set, use current time
       if (status === 'active' && !event.start_time) {
         updates.start_time = new Date().toISOString();
@@ -90,7 +91,7 @@ export function AdminEventTimer({ event, onUpdate }: AdminEventTimerProps) {
       const { error } = await db
         .from('events')
         .update(updates)
-        .eq('id', event.id);
+        .eq('id', event._id || event.id);
 
       if (error) throw error;
       toast.success(`Event ${status === 'active' ? 'started' : status === 'paused' ? 'paused' : 'reset'}`);
@@ -113,7 +114,7 @@ export function AdminEventTimer({ event, onUpdate }: AdminEventTimerProps) {
           start_time: null,
           end_time: null,
         })
-        .eq('id', event.id);
+        .eq('id', event._id || event.id);
 
       if (error) throw error;
       setStartTime('');

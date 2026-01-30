@@ -1,25 +1,24 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import db from '@/integrations/mongo/client';
+import { API_BASE } from '@/integrations/mongo/client';
 import {
   Trophy,
-  Medal,
+  Crown,
   TrendingUp,
-  Zap,
-  Clock,
-  Target,
-  Shield
+  AlertCircle
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
-interface ScoreEntry {
-  id: string;
+interface LeaderboardEntry {
+  _id: string;
   team_id: string;
   team_name: string;
   total_score: number;
-  accuracy_score: number;
-  latency_score: number;
-  stability_score: number;
-  rank: number;
+  points?: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  status: 'active' | 'eliminated';
 }
 
 interface LiveScoreboardProps {
@@ -28,88 +27,60 @@ interface LiveScoreboardProps {
 }
 
 export function LiveScoreboard({ eventId, limit = 10 }: LiveScoreboardProps) {
-  const [scores, setScores] = useState<ScoreEntry[]>([]);
+  const [scores, setScores] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentEventId, setCurrentEventId] = useState<string | undefined>(eventId);
 
   useEffect(() => {
-    fetchScores();
-    // Simple polling to mimic "live" updates without realtime channels
-    const intervalId = setInterval(fetchScores, 10000);
-    return () => clearInterval(intervalId);
-  }, [eventId]);
-
-  const fetchScores = async () => {
-    try {
-      let query = db
-        .from('scores')
-        .select(`
-          id,
-          team_id,
-          total_score,
-          accuracy_score,
-          latency_score,
-          stability_score,
-          teams!inner(name)
-        `)
-        .order('total_score', { ascending: false })
-        .limit(limit);
-
-      if (eventId) {
-        query = query.eq('event_id', eventId);
-      } else {
-        // If no event ID, we technically shouldn't fetch specific event scores, 
-        // but if the user wants global scores, we can omit this.
-        // However, the crash likely happens if we try to filter by undefined.
-        // The safe bet is: if eventId is passed but null, don't run.
-        // But the prop says eventId?: string.
+    const initialize = async () => {
+      let targetEventId = eventId;
+      
+      if (!targetEventId) {
+        try {
+          const res = await fetch(`${API_BASE}/api/events`);
+          if (res.ok) {
+            const events = await res.json();
+            // Prefer active event, otherwise take the most recent one
+            const active = events.find((e: any) => e.status === 'active') || events[0];
+            if (active) {
+              targetEventId = active._id || active.id;
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch events:', error);
+        }
       }
 
-      const { data, error } = await query;
+      setCurrentEventId(targetEventId);
+      
+      if (targetEventId) {
+        fetchScores(targetEventId);
+      } else {
+        setLoading(false);
+      }
+    };
 
-      if (error) throw error;
+    initialize();
+  }, [eventId]);
 
-      const formattedScores: ScoreEntry[] = (data || []).map((score, index) => ({
-        id: score.id,
-        team_id: score.team_id,
-        team_name: (score.teams as { name: string })?.name || 'Unknown Team',
-        total_score: Number(score.total_score),
-        accuracy_score: Number(score.accuracy_score),
-        latency_score: Number(score.latency_score),
-        stability_score: Number(score.stability_score),
-        rank: index + 1,
-      }));
+  useEffect(() => {
+    if (!currentEventId) return;
+    
+    const intervalId = setInterval(() => fetchScores(currentEventId), 10000);
+    return () => clearInterval(intervalId);
+  }, [currentEventId]);
 
-      setScores(formattedScores);
+  const fetchScores = async (id: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/tournament/leaderboard?event_id=${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setScores(data.slice(0, limit));
+      }
     } catch (error) {
       console.error('Error fetching scores:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getRankIcon = (rank: number) => {
-    switch (rank) {
-      case 1:
-        return <Trophy className="h-5 w-5 text-yellow-400" />;
-      case 2:
-        return <Medal className="h-5 w-5 text-gray-300" />;
-      case 3:
-        return <Medal className="h-5 w-5 text-amber-600" />;
-      default:
-        return <span className="w-5 text-center text-muted-foreground font-display">{rank}</span>;
-    }
-  };
-
-  const getRankStyles = (rank: number) => {
-    switch (rank) {
-      case 1:
-        return 'border-yellow-400/50 bg-yellow-400/5';
-      case 2:
-        return 'border-gray-300/50 bg-gray-300/5';
-      case 3:
-        return 'border-amber-600/50 bg-amber-600/5';
-      default:
-        return '';
     }
   };
 
@@ -118,7 +89,7 @@ export function LiveScoreboard({ eventId, limit = 10 }: LiveScoreboardProps) {
       <div className="glass-card p-6">
         <div className="flex items-center gap-3 mb-6">
           <Trophy className="h-6 w-6 text-primary" />
-          <h2 className="font-display font-bold text-xl">Live Scoreboard</h2>
+          <h2 className="font-display font-bold text-xl">Tournament Standings</h2>
         </div>
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
@@ -129,91 +100,87 @@ export function LiveScoreboard({ eventId, limit = 10 }: LiveScoreboardProps) {
     );
   }
 
-  if (scores.length === 0) {
-    return (
-      <div className="glass-card p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Trophy className="h-6 w-6 text-primary" />
-          <h2 className="font-display font-bold text-xl">Live Scoreboard</h2>
-        </div>
-        <div className="text-center py-12 text-muted-foreground">
-          <Trophy className="h-12 w-12 mx-auto mb-4 opacity-30" />
-          <p>No scores yet. Competition hasn't started.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="glass-card p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Trophy className="h-6 w-6 text-primary" />
-          <h2 className="font-display font-bold text-xl">Live Scoreboard</h2>
+          <div className="p-2 rounded-lg bg-accent/10">
+            <Crown className="h-5 w-5 text-accent" />
+          </div>
+          <h2 className="font-display font-bold text-xl">Tournament Standings</h2>
         </div>
         <div className="flex items-center gap-2 text-xs text-success">
-          <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-          Real-time
+          <TrendingUp className="h-3 w-3" />
+          Live
         </div>
       </div>
 
-      {/* Score Legend */}
-      <div className="flex items-center gap-4 mb-4 text-xs text-muted-foreground">
-        <div className="flex items-center gap-1">
-          <Target className="h-3 w-3 text-primary" />
-          Accuracy
-        </div>
-        <div className="flex items-center gap-1">
-          <Clock className="h-3 w-3 text-accent" />
-          Latency
-        </div>
-        <div className="flex items-center gap-1">
-          <Shield className="h-3 w-3 text-success" />
-          Stability
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        {scores.map((score, index) => (
-          <motion.div
-            key={score.id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.05 }}
-            className={`flex items-center gap-4 p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-colors ${getRankStyles(score.rank)}`}
-          >
-            <div className="w-8 flex justify-center">
-              {getRankIcon(score.rank)}
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <div className="font-display font-semibold text-foreground truncate">
-                {score.team_name}
-              </div>
-              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                <span className="flex items-center gap-1">
-                  <Target className="h-3 w-3 text-primary" />
-                  {score.accuracy_score.toFixed(1)}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3 text-accent" />
-                  {score.latency_score.toFixed(1)}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Shield className="h-3 w-3 text-success" />
-                  {score.stability_score.toFixed(1)}
-                </span>
-              </div>
-            </div>
-
-            <div className="text-right">
-              <div className="score-display text-2xl">
-                {score.total_score.toFixed(0)}
-              </div>
-              <div className="text-xs text-muted-foreground">points</div>
-            </div>
-          </motion.div>
-        ))}
+      <div className="relative overflow-x-auto">
+        <table className="w-full text-sm text-left">
+          <thead className="text-xs text-muted-foreground uppercase bg-muted/30">
+            <tr>
+              <th className="px-4 py-3 rounded-l-lg">Rank</th>
+              <th className="px-4 py-3">Team</th>
+              <th className="px-4 py-3 text-center">Points</th>
+              <th className="px-4 py-3 text-center">W-L-D</th>
+              <th className="px-4 py-3 rounded-r-lg text-right">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {scores.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <AlertCircle className="h-8 w-8 opacity-50" />
+                    <p>No tournament data available yet.</p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              scores.map((team, index) => (
+                <motion.tr
+                  key={team._id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="border-b border-border/50 last:border-0 hover:bg-muted/5"
+                >
+                  <td className="px-4 py-3 font-medium">
+                    {index === 0 ? (
+                      <Crown className="h-4 w-4 text-warning fill-warning/20" />
+                    ) : (
+                      <span className="ml-1 text-muted-foreground">
+                        #{index + 1}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 font-semibold">
+                    {team.team_name}
+                  </td>
+                  <td className="px-4 py-3 text-center font-mono text-primary font-bold">
+                    {team.points ?? (team.wins * 2 + team.draws)}
+                  </td>
+                  <td className="px-4 py-3 text-center text-muted-foreground">
+                    <span className="text-success">{team.wins}</span> -
+                    <span className="text-destructive">{team.losses}</span> -
+                    <span className="text-warning">{team.draws}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Badge
+                      variant="outline"
+                      className={team.status === 'active'
+                        ? 'text-success border-success/30'
+                        : 'text-muted-foreground'
+                      }
+                    >
+                      {team.status.toUpperCase()}
+                    </Badge>
+                  </td>
+                </motion.tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
