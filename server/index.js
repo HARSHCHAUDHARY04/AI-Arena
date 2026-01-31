@@ -34,7 +34,7 @@ app.get("/round2.pdf", (req, res) => {
 
 // Serve round 4 PDF at root as well
 app.get("/round4.pdf", (req, res) => {
-  res.sendFile(path.join(__dirname, "pdfs", "Franz_Kafka_The_Trial.pdf"));
+  res.sendFile(path.join(__dirname, "pdfs", "round4.pdf"));
 });
 
 // Serve round 5 PDF at root

@@ -131,7 +131,7 @@ In the FEVER fact verification task analysis, the top retrieved document came fr
       "HIERARCHY ANALYSIS: Court access (e.g., Titorelli) is unrelated to wealth (Block) or profession (K.). Economic status is inverted/destroyed—the court nullifies worldly achievements. Hereditary/insider positions matter more than achievement. The court functions as a separate class system where once accused, your social status becomes irrelevant except as something to be destroyed. Economic/professional status provides no protection."
     ],
     difficulty: "expert",
-    timeout: 120000,
+    timeout: 180000,
   },
 
   5: {
@@ -155,7 +155,7 @@ In the FEVER fact verification task analysis, the top retrieved document came fr
       "Explicitly stated: English section states value comes from innovative data use, not tools. French narrative shows direct sales eliminating middlemen for better profits. Hindi section emphasizes continuous effort and family contribution. Logical inference: All three sections converge on the principle that sustainable value creation requires removing unnecessary intermediaries (whether conceptual, commercial, or procedural), directly engaging with core resources (data, customers, craft), and applying sustained, skillful effort rather than relying solely on external tools or systems."
     ],
     difficulty: "hard",
-    timeout: 25000
+    timeout: 180000
   }
 };
 
