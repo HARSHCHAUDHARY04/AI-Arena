@@ -38,7 +38,7 @@ In the FEVER fact verification task analysis, the top retrieved document came fr
   2: {
     roundNumber: 2,
     name: "Agentic AI - Basic Understanding Round (Corrected)",
-    pdfLink: "https://www.aibattlearena.in/round2.pdf",
+    pdf_url: "https://www.aibattlearena.in/round2.pdf",
     description:
       "Factual retrieval questions for the Agentic AI systematic review paper - corrected based on actual paper content",
 
@@ -78,7 +78,7 @@ In the FEVER fact verification task analysis, the top retrieved document came fr
   3: {
     roundNumber: 3,
     name: "Agentic AI - Medium Comprehension Round",
-    pdfLink: "https://arxiv.org/pdf/2510.25445",
+    pdf_url: "https://arxiv.org/pdf/2510.25445",
     description:
       "Medium-difficulty questions requiring synthesis across sections, understanding of relationships, and multi-hop retrieval from the Agentic AI systematic review paper",
     questions: [
@@ -109,7 +109,7 @@ In the FEVER fact verification task analysis, the top retrieved document came fr
   4: {
     roundNumber: 4,
     name: "Advanced Reasoning Round",
-    pdfLink: "https://example.com/rounds/round4_advanced_rag.pdf",
+    pdf_url: "https://example.com/rounds/round4_advanced_rag.pdf",
     description: "Complex multi-hop reasoning and synthesis",
     questions: [
       "In a RAG system, if the retrieval component achieves 85% recall but 60% precision, and the LLM has 90% accuracy on retrieved documents, what is the approximate end-to-end accuracy?",
@@ -133,7 +133,7 @@ In the FEVER fact verification task analysis, the top retrieved document came fr
   5: {
     roundNumber: 5,
     name: "Championship Final Round",
-    pdfLink: "https://example.com/rounds/round5_championship.pdf",
+    pdf_url: "https://example.com/rounds/round5_championship.pdf",
     description: "Comprehensive evaluation across all RAG dimensions",
     questions: [
       "Compare and contrast the advantages and limitations of BM25 versus dense retrieval methods for multi-hop question answering, considering both retrieval quality and computational efficiency.",
