@@ -32,6 +32,16 @@ app.get("/round2.pdf", (req, res) => {
   res.sendFile(path.join(__dirname, "pdfs", "round2.pdf"));
 });
 
+// Serve round 4 PDF at root as well
+app.get("/round4.pdf", (req, res) => {
+  res.sendFile(path.join(__dirname, "pdfs", "Franz_Kafka_The_Trial.pdf"));
+});
+
+// Serve round 5 PDF at root
+app.get("/round5.pdf", (req, res) => {
+  res.sendFile(path.join(__dirname, "pdfs", "Level5.pdf"));
+});
+
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017";
 const DB_NAME = process.env.DB_NAME || "ai_arena";
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";

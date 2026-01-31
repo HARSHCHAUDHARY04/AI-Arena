@@ -439,6 +439,18 @@ async function executeMatchesParallel(db, eventId, roundNumber, matches) {
 async function evaluateMatch(db, match, roundNumber) {
   try {
     if (!match.team_b_id) {
+      // BYE match - still need to update team progress for scoreboard
+      await updateTeamProgress(
+        db,
+        match.event_id,
+        match.team_a_id,
+        null, // No opponent (BYE)
+        "team_a_win",
+        10, // BYE score
+        0,
+        roundNumber,
+        "Automatic win - BYE (no opponent)"
+      );
       return { success: true, result: "bye" };
     }
 
