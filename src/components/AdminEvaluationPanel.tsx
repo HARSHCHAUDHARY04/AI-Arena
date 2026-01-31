@@ -159,7 +159,7 @@ export function AdminEvaluationPanel({ eventId }: AdminEvaluationPanelProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     endpoint_url: teamEndpoint,
-                    payload: { pdf_link: pdfUrl, questions: questions }
+                    payload: { pdf_url: pdfUrl, questions: questions }
                 }),
             });
 

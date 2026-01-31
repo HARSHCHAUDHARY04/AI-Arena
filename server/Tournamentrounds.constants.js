@@ -8,7 +8,7 @@ const TOURNAMENT_ROUNDS = {
   1: {
     roundNumber: 1,
     name: "RAG Fundamentals (NeurIPS 2020)",
-    pdfLink:
+    pdf_url:
       "https://proceedings.neurips.cc/paper/2020/file/6b493230205f780e1bc26945df7481e5-Paper.pdf",
     description:
       "Understanding the foundational RAG paper: Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",

@@ -393,7 +393,7 @@ app.post("/api/evaluate-api", async (req, res) => {
       // but the current testApiEndpoint only takes 'input'. 
       // We'll wrap it to match what the participant dashboard expects.
       const result = await testApiEndpoint(endpoint_url, {
-        pdf_link: roundConfig.pdfLink,
+        pdf_url: roundConfig.pdf_url,
         questions: [testCase.input]
       });
 
@@ -420,6 +420,10 @@ app.post("/api/evaluate-api", async (req, res) => {
             level_id: level_id || null,
             evaluated_at: new Date(),
           },
+          dataset_meta: {
+            pdf_url: roundConfig.pdf_url,
+            questions: roundConfig.questions || []
+          }
         },
       );
     } else {
@@ -718,9 +722,9 @@ app.post("/api/verify-all-endpoints", async (req, res) => {
 // [NEW] Dataset Management
 app.post("/api/rounds/:id/dataset", async (req, res) => {
   const { id } = req.params;
-  const { dataset_name, dataset_description, pdf_link, questions } = req.body;
-  if (!pdf_link || !questions)
-    return res.status(400).json({ error: "pdf_link and questions required" });
+  const { dataset_name, dataset_description, pdf_url, questions } = req.body;
+  if (!pdf_url || !questions)
+    return res.status(400).json({ error: "pdf_url and questions required" });
 
   try {
     const round = await db
@@ -736,7 +740,7 @@ app.post("/api/rounds/:id/dataset", async (req, res) => {
         $set: {
           dataset_name,
           dataset_description,
-          dataset_meta: { pdf_link, questions }, // Store securely, not sending back to clients unless authorized
+          dataset_meta: { pdf_url, questions }, // Store securely, not sending back to clients unless authorized
           dataset_locked: true, // Lock immediately as per specific rule "Once uploaded... Locked"
         },
       },

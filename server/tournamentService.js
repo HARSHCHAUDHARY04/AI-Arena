@@ -49,7 +49,7 @@ async function initializeTournament(db, eventId) {
       event_id: eventId,
       name: roundConfig.name,
       description: roundConfig.description,
-      pdf_link: roundConfig.pdfLink,
+      pdf_url: roundConfig.pdf_url,
       difficulty: roundConfig.difficulty,
       status: "pending",
       started_at: null,
@@ -518,13 +518,13 @@ async function evaluateMatch(db, match, roundNumber) {
     const [responseA, responseB] = await Promise.all([
       fetchTeamResponses(
         teamA.endpoint_url,
-        roundConfig.pdfLink,
+        roundConfig.pdf_url,
         roundConfig.questions,
         roundConfig.timeout,
       ),
       fetchTeamResponses(
         teamB.endpoint_url,
-        roundConfig.pdfLink,
+        roundConfig.pdf_url,
         roundConfig.questions,
         roundConfig.timeout,
       ),
@@ -627,7 +627,7 @@ async function evaluateMatch(db, match, roundNumber) {
  * Fetch responses from team's API endpoint
  * Sends all questions at once and receives answers as a list
  */
-async function fetchTeamResponses(endpointUrl, pdfLink, questions, timeout) {
+async function fetchTeamResponses(endpointUrl, pdf_url, questions, timeout) {
   try {
     const startTime = Date.now();
     const controller = new AbortController();
@@ -637,7 +637,7 @@ async function fetchTeamResponses(endpointUrl, pdfLink, questions, timeout) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        pdf_link: pdfLink,
+        pdf_url: pdf_url,
         questions: questions, // Send all questions as array
       }),
       signal: controller.signal,

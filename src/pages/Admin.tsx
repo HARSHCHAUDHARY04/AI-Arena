@@ -190,7 +190,7 @@ export default function AdminDashboard() {
         dataset_name: newRound.dataset_name,
         dataset_description: newRound.dataset_description,
         dataset_meta: {
-          pdf_link: newRound.problem_statement, // Using problem_statement field for PDF URL temporarily or add specific field
+          pdf_url: newRound.problem_statement,
           questions: newRound.evaluation_criteria?.split('\n').filter(q => q.trim().length > 0) || []
         },
         problem_statement: newRound.problem_statement, // Keeping for PDF URL reference in UI
