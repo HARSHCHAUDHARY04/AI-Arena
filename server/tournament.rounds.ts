@@ -18,76 +18,105 @@ export interface RoundConfig {
 export const TOURNAMENT_ROUNDS: Record<number, RoundConfig> = {
   1: {
     roundNumber: 1,
-    name: "Factual Retrieval Round",
-    pdfLink: "https://example.com/rounds/round1_frames_paper.pdf",
-    description: "Basic factual retrieval and dataset understanding",
+    name: "RAG Fundamentals (NeurIPS 2020)",
+    pdfLink:
+      "https://proceedings.neurips.cc/paper/2020/file/6b493230205f780e1bc26945df7481e5-Paper.pdf",
+    description:
+      "Understanding the foundational RAG paper: Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
     questions: [
-      "What does the acronym FRAMES stand for, and what is the primary purpose of this dataset?",
-      "How many test samples does the FRAMES dataset contain?",
-      "Which state-of-the-art LLM models were evaluated in this paper, and what are their release dates?",
-      "What are the five types of reasoning that questions in FRAMES can be labeled with?",
-      "What is the range of Wikipedia articles required to answer questions in the FRAMES dataset?"
+      "What are the two main components that RAG combines, and what pre-trained models are used for each component?",
+      "What is the key difference between RAG-Sequence and RAG-Token models in how they handle retrieved documents?",
+      "Which Wikipedia dump and how many documents were used for the non-parametric memory in the RAG experiments?",
+      "On which three open-domain QA datasets did RAG achieve state-of-the-art results according to the paper?",
+      "What percentage of cases did the top retrieved document come from a gold article in the FEVER fact verification task?",
     ],
-    context: `FRAMES stands for "Factuality, Retrieval, And reasoning MEasurement Set." It is designed to test LLMs' factual responses, retrieval capabilities, and reasoning in generating final answers in end-to-end RAG scenarios. The dataset contains 824 test samples. The models evaluated were: Gemini-Pro-1.5 (5/14/24), Gemini-Flash-1.5 (5/14/24), Gemma2-27b (6/27/24), LLama3.2-3B-I (9/25/24), and Qwen2.5-3B-I (9/19/24). The five reasoning types are: Numerical Reasoning, Tabular Reasoning, Multiple Constraints, Temporal Reasoning, and Post-Processing. Each question in FRAMES requires 2-15 Wikipedia articles to answer.`,
+    context: `The RAG paper introduces Retrieval-Augmented Generation, which combines two components: a retriever (using Dense Passage Retriever/DPR with BERT) and a generator (using BART-large with 400M parameters). The parametric memory is a pre-trained seq2seq transformer, and the non-parametric memory is a dense vector index of Wikipedia.
+  RAG-Sequence uses the same retrieved document to generate the complete output sequence, treating it as a single latent variable. RAG-Token can draw a different latent document for each target token, allowing content from multiple documents.
+The experiments used the December 2018 Wikipedia dump, split into 21 million disjoint 100-word chunks. They built a FAISS index with a Hierarchical Navigable Small World approximation for fast retrieval.
+RAG set state-of-the-art results on three open-domain QA tasks: Natural Questions (NQ), WebQuestions (WQ), and CuratedTrec (CT). It also performed strongly on TriviaQA.
+In the FEVER fact verification task analysis, the top retrieved document came from a gold article in 71% of cases, and a gold article was present in the top 10 retrieved articles in 90% of cases.`,
     groundTruths: [
-      "FRAMES stands for 'Factuality, Retrieval, And reasoning MEasurement Set.' It is designed to test LLMs' factual responses, retrieval capabilities, and reasoning in generating final answers in end-to-end RAG scenarios.",
-      "The FRAMES dataset contains 824 test samples/questions.",
-      "The models evaluated were: Gemini-Pro-1.5 (5/14/24), Gemini-Flash-1.5 (5/14/24), Gemma2-27b (6/27/24), LLama3.2-3B-I (9/25/24), Qwen2.5-3B-I (9/19/24)",
-      "The five reasoning types are: Numerical Reasoning, Tabular Reasoning, Multiple Constraints, Temporal Reasoning, and Post-Processing.",
-      "Each question in FRAMES requires 2-15 Wikipedia articles to answer."
+      "RAG combines two main components: (1) a retriever p_η(z|x) using Dense Passage Retriever (DPR) based on BERT, and (2) a generator p_θ(y_i|x,z,y_{1:i-1}) using BART-large, a pre-trained seq2seq transformer with 400M parameters. The parametric memory is the BART generator and the non-parametric memory is a dense vector index of Wikipedia.",
+      "RAG-Sequence uses the same retrieved document to predict each target token and generate the complete sequence, treating the retrieved document as a single latent variable. RAG-Token can predict each target token based on a different document, drawing a different latent document for each token and marginalizing accordingly, allowing the generator to choose content from several documents.",
+      "The experiments used the December 2018 Wikipedia dump. Each Wikipedia article was split into disjoint 100-word chunks, making a total of 21 million (21M) documents for the non-parametric knowledge source.",
+      "RAG achieved state-of-the-art results on three open-domain QA datasets: Natural Questions (NQ), WebQuestions (WQ), and CuratedTrec (CT). The paper also mentions strong performance on TriviaQA.",
+      "In the FEVER fact verification task, the top retrieved document came from a gold article in 71% of cases. Additionally, a gold article was present in the top 10 retrieved articles in 90% of cases.",
     ],
-    difficulty: "easy",
-    timeout: 15000
+    difficulty: "medium",
+    timeout: 120000,
   },
 
   2: {
     roundNumber: 2,
-    name: "Methodology Comprehension Round",
-    pdfLink: "https://example.com/rounds/round2_frames_paper.pdf",
-    description: "Understanding of methodology and experimental design",
+    name: "Agentic AI - Basic Understanding Round (Corrected)",
+    pdfLink: "https://www.aibattlearena.in/round2.pdf",
+    description:
+      "Factual retrieval questions for the Agentic AI systematic review paper - corrected based on actual paper content",
+
     questions: [
-      "What was the main problem encountered when attempting to generate the dataset synthetically using LLMs?",
-      "What was the baseline accuracy achieved by Gemini-Pro-1.5-0514 using naive prompting (without retrieval)?",
-      "What are the three baseline prompting methods used in single-step evaluations, and what does each method involve?",
-      "What specific quality check was implemented to prevent LLMs from achieving high accuracy through random guessing?",
-      "How was the LLM-based auto-rating mechanism validated, and what metrics demonstrated its reliability?"
+      "According to Figure 1, what are the six key aspects of Agentic AI mentioned in the paper?",
+      "What is the primary difference between the Copilot model and the Autopilot model in AI systems?",
+      "Which four industries are mentioned as application areas for Agentic AI in Section 1.1.1?",
+      "In which decade did the deep learning revolution occur, and what were the two key technological milestones mentioned?",
+      "According to the McKinsey report cited in the paper, what percentage improvement in productivity can AI-driven automation achieve in some industries?",
+      "What are the three main challenges associated with Agentic AI implementation mentioned in Section 1.2?",
+      "Name at least three commercial AI tools or platforms and three open-source solutions discussed in Section 7.",
     ],
-    context: `When attempting to generate the dataset synthetically, the main problem was a high proportion of hallucinated questions and answers (>30%), and the LLM struggled to generate questions requiring more than four articles. The naive prompting baseline achieved 0.408 (40.8%) accuracy. The three baseline methods are: Naive Prompt (simply asking without retrieval), BM25-Retrieved Prompt (augmenting with top n_docs using BM25 scoring), and Oracle Prompt (including ALL ground truth Wikipedia articles). Questions with binary answers were removed to prevent 50% accuracy through random guessing. The auto-rating mechanism showed strong alignment with accuracy of 0.96 and Cohen's Kappa of 0.889 for Gemini-Pro-1.5-0514.`,
+
+    context:
+      "This paper presents a systematic review of Agentic AI and its role in shaping a smart future. It explores key aspects including autonomy, goal-oriented behavior, environmental interaction, learning capability, workflow optimization, and multi-agent systems. The paper discusses the evolution from assisted 'Copilot' models to autonomous 'Autopilot' models, examines hierarchical agent architectures, and reviews various commercial tools (LangGraph, CrewAI, IBM Watson, Amazon SageMaker) and open-source solutions (AutoGen, AutoGPT, TensorFlow, Llama). It addresses challenges including data security, privacy concerns, ethical issues, and workforce transformation while highlighting applications across energy, transportation, healthcare, and finance sectors.",
+
     groundTruths: [
-      "The main problem was a high proportion of hallucinated questions and answers (>30%). Additionally, the LLM struggled to generate questions that strictly required more than four articles.",
-      "The naive prompting baseline achieved an accuracy of 0.408 (or 40.8%).",
-      "The three baseline methods are: Naive Prompt (simply asking the question without search retrieval), BM25-Retrieved Prompt (augmenting the question with top n_docs Wikipedia articles using BM25 scoring), and Oracle Prompt (including the question with ALL ground truth Wikipedia articles used by annotators).",
-      "Questions with binary answers ('yes' or 'no') were removed to prevent LLMs from achieving 50% accuracy through random guessing.",
-      "The auto-rating mechanism was tested against human evaluations and showed strong alignment with an accuracy of 0.96 and Cohen's Kappa of 0.889 for Gemini-Pro-1.5-0514, making it a suitable approach for evaluation."
+      "According to Figure 1, the six key aspects of Agentic AI are: (1) Autonomy - the ability to operate independently and make decisions without direct human intervention, (2) Goal-oriented behavior - pursuing specific objectives and optimizing actions to achieve desired outcomes, (3) Environmental interaction (Interaction with the environment) - perceiving and adapting to changes in surroundings, (4) Learning capability (Ability to learn) - improving performance over time through machine learning or reinforcement learning, (5) Workflow optimization - combining language understanding, reasoning, planning, and decision-making to enhance business processes, and (6) Multi-agent systems (Multiagent dialog and system) - enabling communication among agents for creating complex workflows.",
+
+      "The Copilot model functions as an AI assistant that supports human operators within a 'human-in-the-loop' framework, providing recommendations and requiring human oversight. The Autopilot model represents fully autonomous AI systems capable of operating independently without human intervention, making decisions and executing tasks with minimal or no human supervision.",
+
+      "The four industries mentioned for Agentic AI applications in Section 1.1.1 are: (1) Energy - optimizes energy consumption, predicts demand, and enhances the efficiency of renewable resources, (2) Transportation - improves route planning, reduces delivery times, and enhances supply chain logistics, (3) Healthcare - aids in medical diagnosis, personalized treatment plans, and patient data management, and (4) Finance - analyzes market trends, assesses investment risks, and optimizes financial decision-making.",
+
+      "The deep learning revolution occurred in the 2010s. The two key technological milestones mentioned were: (1) The introduction of AlexNet, which demonstrated the power of convolutional neural networks (CNNs) in image recognition, and (2) The development of the Transformer architecture, which revolutionized Natural Language Processing (NLP), enabling context-aware language models and multimodal processing.",
+
+      "According to a McKinsey report cited in Section 3, AI-driven automation can improve productivity by up to 40% in some industries by reducing manual workloads and optimizing workflows.",
+
+      "The three main challenges associated with Agentic AI implementation mentioned in Section 1.2 are: (1) Data Security & Privacy - AI systems process vast amounts of sensitive data, making them vulnerable to breaches, requiring stringent data protection policies and compliance with legal frameworks, (2) Ethical & Regulatory Concerns - Autonomous AI decisions can have unintended consequences, necessitating transparent AI governance models and ethical AI principles, and (3) Workforce Transformation - Automation raises concerns about job displacement, requiring proactive workforce reskilling initiatives and AI-human collaboration strategies.",
+
+      "Commercial AI tools/platforms discussed in Section 7 include: LangGraph (designed for customer support with statefulness and streaming), CrewAI (tailored for Fortune 500 companies with no-code tools), IBM Watson (provides AI services for healthcare, finance, and retail with NLP and predictive analytics), and Amazon SageMaker (streamlines ML model creation and deployment). Open-source solutions include: AutoGen (facilitates multi-agent collaboration), AutoGPT (leverages GPT-4 for autonomous task performance), TensorFlow (library for building ML models), and Llama (Meta's open-source LLMs).",
     ],
-    difficulty: "medium",
-    timeout: 20000
+
+    difficulty: "easy",
+    timeout: 120000,
   },
 
   3: {
     roundNumber: 3,
-    name: "Performance Analysis Round",
-    pdfLink: "https://example.com/rounds/round3_frames_paper.pdf",
-    description: "Numerical analysis and comparative evaluation",
+    name: "Agentic AI - Medium Comprehension Round",
+    pdfLink: "https://arxiv.org/pdf/2510.25445",
+    description:
+      "Medium-difficulty questions requiring synthesis across sections, understanding of relationships, and multi-hop retrieval from the Agentic AI systematic review paper",
     questions: [
-      "By how much did the multi-step retrieval pipeline improve accuracy compared to naive prompting, and what was the final accuracy achieved?",
-      "According to the dataset statistics, what percentage of questions require exactly two Wikipedia articles, and what percentage require three articles?",
-      "What was the Oracle Prompt accuracy for Gemini-Pro-1.5-0514, and what do the errors in this setting reveal about model limitations?",
-      "How did the researchers address the issue of answers changing over time, and can you provide an example of how a question was modified?",
-      "According to Table 1, which existing datasets evaluate retrieval capabilities, and how does FRAMES differ from them?"
+      "What is 'conceptual retrofitting' and why do the authors argue it's problematic when applied to modern LLM-based agentic systems?",
+      "Describe the two independent dimensions used in the dual-paradigm taxonomy framework (Figure 2) for categorizing agentic systems.",
+      "According to the paper's historical timeline (Figure 1), which five distinct eras mark the evolution of AI, and in which era did the Transformer architecture emerge?",
+      "What are the three orchestration mechanisms used by modern neural agentic frameworks according to Table 3, and name one framework that exemplifies each mechanism?",
+      "Based on Table 6, which architectural paradigm dominates in healthcare applications and what are the two primary constraints that drive this choice?",
+      "What was the final corpus size for the systematic PRISMA-based review, and why were 12 additional papers included beyond the primary search results?",
+      "According to the paper, what is the fundamental operational difference between how symbolic systems and neural systems achieve multi-agent coordination?",
     ],
-    context: `The multi-step retrieval pipeline improved accuracy from 0.408 (naive prompting) to 0.66, representing a greater than 50% improvement. Approximately 36% of questions require two articles, and approximately 35% require three articles. Oracle Prompt achieved 0.729 accuracy; of the 27% errors, approximately 80% belonged to numerical, tabular, and post-processing categories. Annotators added extra context with specific dates for temporal disambiguation. For example, the FIFA World Cup question was revised to include "As of August 1, 2024" for clarity. Natural Questions and ELI5 evaluate retrieval, and Multihop-RAG evaluates both factuality and retrieval, but FRAMES uniquely provides comprehensive evaluation of all three components (Factuality, Retrieval, AND Reasoning) together.`,
-    groundTruths: [
-      "The multi-step retrieval pipeline improved accuracy from 0.408 (naive prompting) to 0.66, representing a greater than 50% improvement in performance.",
-      "Approximately 36% of questions require two articles, and approximately 35% require three articles.",
-      "Oracle Prompt achieved 0.729 accuracy. Of the 27% errors, approximately 80% belonged to numerical, tabular, and post-processing categories, revealing reasoning gaps where the model failed to reason through facts even when all relevant information was provided.",
-      "Annotators added extra context with specific dates to disambiguate answers that could change over time. For example, the question 'Which country were holders of the FIFA World Cup the last time the UEFA Champions League was won by a club from London?' was revised to 'As of August 1, 2024, which country were holders of the FIFA World Cup the last time the UEFA Champions League was won by a club from London?'",
-      "Natural Questions and ELI5 evaluate retrieval, and Multihop-RAG evaluates both factuality and retrieval. However, FRAMES is unique in providing a comprehensive evaluation of all three components (Factuality, Retrieval, AND Reasoning) together in a unified framework, along with multi-hop questions and temporal disambiguation."
-    ],
-    difficulty: "medium",
-    timeout: 25000
-  },
 
+    context: `This survey introduces a dual-paradigm framework categorizing agentic systems into Symbolic/Classical (algorithmic planning, persistent state) and Neural/Generative (stochastic generation, prompt-driven orchestration) lineages. Through a PRISMA-based review of 90 studies (2018-2025), it analyzes theoretical foundations, domain-specific implementations, and paradigm-specific challenges. The paper argues against conceptual retrofitting—misapplying classical frameworks like BDI to modern LLMs—and demonstrates that paradigm choice is strategic: symbolic systems dominate safety-critical domains while neural systems prevail in adaptive environments.`,
+
+    groundTruths: [
+      "Conceptual retrofitting is the misapplication of classical symbolic frameworks (e.g., Belief-Desire-Intention (BDI), perceive-plan-act-reflect (PPAR) loops) to describe modern systems built on large language models (LLMs). The authors argue this is problematic because it obscures the true operational mechanics of LLM-based agents, which operate on fundamentally different principles of stochastic generation and prompt-driven orchestration rather than algorithmic symbolic planning. This practice creates a false sense of continuity between incompatible architectural paradigms.",
+      "The dual-paradigm taxonomy framework uses two independent dimensions: (1) Architectural Paradigm, which distinguishes between Symbolic/Classical systems (relying on algorithmic planning and persistent state) and Neural/Generative systems (leveraging stochastic generation and prompt-driven orchestration), and (2) Agency & Coordination, which distinguishes between Single-Agent systems and Multi-Agent Systems (MAS). This framework is designed as an analytical tool for classification and comparison, not to show chronological evolution.",
+      "The five distinct eras in AI evolution are: (1) Symbolic AI Era (1950s-1980s), (2) Machine Learning Era (1980s-2010s), (3) Deep Learning Era (2010s-Present), (4) Generative AI Era (2014-Present), and (5) Agentic AI Era (2022-Present). The Transformer architecture emerged in 2017 during the Generative AI Era, enabling the scaling of large language models like GPT and BERT.",
+      "According to Table 3, the three orchestration mechanisms are: (1) Prompt Chaining (exemplified by LangChain), which orchestrates linear sequences of LLM calls and API tools; (2) Multi-Agent Conversation (exemplified by AutoGen), which facilitates structured dialogues between collaborative LLM agents; and (3) Role-Based Workflow (exemplified by CrewAI), which assigns roles and goals to a team of agents and manages their interaction workflow.",
+      "The Symbolic/Deterministic paradigm (or Hybrid) dominates in healthcare applications. The two primary constraints driving this choice are: (1) Safety and high reliability requirements, and (2) Privacy (HIPAA compliance), Explainability, and the need for verifiable, auditable pipelines. These constraints favor deterministic, rule-based approaches over emergent neural behavior to ensure patient safety and regulatory compliance.",
+      "The final corpus size was 90 publications. The 12 additional papers were included through a supplemental phase during thematic synthesis. These were seminal theoretical papers from the symbolic paradigm (e.g., foundational works on MDPs and cognitive architectures like BDI and SOAR) that were essential for providing complete historical context and understanding the symbolic lineage, though they were analyzed separately from contemporary neural paradigm research.",
+      "Symbolic systems achieve multi-agent coordination through pre-defined, algorithmic protocols rooted in distributed AI research (e.g., Contract Net Protocol, Blackboard Systems, Market-Based Approaches). These are engineered to ensure predictable, verifiable, and fault-tolerant interactions with explicit state management. In contrast, neural systems achieve coordination through emergent properties of structured conversation and prompt-driven orchestration, where coordination emerges from conversation-based patterns, role-based workflows, or dynamic context management within LLM context windows, making decisions stochastically rather than deterministically.",
+    ],
+
+    difficulty: "medium",
+    timeout: 120000,
+  },
   4: {
     roundNumber: 4,
     name: "Advanced Reasoning Round",
@@ -151,7 +180,7 @@ export function getRoundConfig(roundNumber: number): RoundConfig {
  * Get all round configurations
  */
 export function getAllRounds(): RoundConfig[] {
-  return Object.values(TOURNAMENT_ROUNDS);
+  return Object.values(TOURNAMENT_ROUNDS) as RoundConfig[];
 }
 
 /**

@@ -22,7 +22,7 @@ const POINTS = {
 // Initialize Anthropic client
 const anthropicClient = new Anthropic({
   apiKey:
-    process.env.ANTHROPIC_API_KEY 
+    process.env.ANTHROPIC_API_KEY
 });
 
 /**
@@ -153,7 +153,7 @@ async function generateMatchups(db, eventId, roundNumber) {
   const existingMatches = await db
     .collection("tournament_matches")
     .find({ event_id: eventId, round_number: roundNumber })
-    .toArray(); 
+    .toArray();
 
   if (existingMatches.length > 0) {
     return {
@@ -649,10 +649,10 @@ async function fetchTeamResponses(endpointUrl, pdfLink, questions, timeout) {
     if (response.ok) {
       const data = await response.json();
       const answers = data.answers || [];
-      
+
       // Ensure we have an answer for each question
       const paddedAnswers = questions.map((_, index) => answers[index] || "");
-      
+
       return {
         answers: paddedAnswers,
         avgLatency: Math.round(totalLatency),
@@ -772,7 +772,7 @@ Respond with this exact JSON structure:
 }`;
 
   const response = await anthropicClient.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-3-5-sonnet-20241022",
     max_tokens: 2048,
     temperature: 0, // Deterministic output
     system: systemPrompt,
@@ -864,14 +864,13 @@ async function updateTeamProgress(
   }
 
   // Update Team A
+  const isDemoRound = roundNumber === 1;
   const teamAUpdate = {
-    $inc: { 
-      total_score: scoreA,
-      points: teamAPoints
-    },
+    $inc: {},
     $push: {
       round_history: {
         round: roundNumber,
+        is_demo: isDemoRound,
         result:
           result === "team_a_win"
             ? "win"
@@ -887,12 +886,17 @@ async function updateTeamProgress(
     },
   };
 
-  if (result === "team_a_win") {
-    teamAUpdate.$inc.wins = 1;
-  } else if (result === "team_b_win") {
-    teamAUpdate.$inc.losses = 1;
-  } else {
-    teamAUpdate.$inc.draws = 1;
+  if (!isDemoRound) {
+    teamAUpdate.$inc.total_score = scoreA;
+    teamAUpdate.$inc.points = teamAPoints;
+
+    if (result === "team_a_win") {
+      teamAUpdate.$inc.wins = 1;
+    } else if (result === "team_b_win") {
+      teamAUpdate.$inc.losses = 1;
+    } else {
+      teamAUpdate.$inc.draws = 1;
+    }
   }
 
   await db
@@ -902,13 +906,11 @@ async function updateTeamProgress(
   // Update Team B (if not BYE)
   if (teamBId) {
     const teamBUpdate = {
-      $inc: { 
-        total_score: scoreB,
-        points: teamBPoints
-      },
+      $inc: {},
       $push: {
         round_history: {
           round: roundNumber,
+          is_demo: isDemoRound,
           result:
             result === "team_b_win"
               ? "win"
@@ -924,12 +926,17 @@ async function updateTeamProgress(
       },
     };
 
-    if (result === "team_b_win") {
-      teamBUpdate.$inc.wins = 1;
-    } else if (result === "team_a_win") {
-      teamBUpdate.$inc.losses = 1;
-    } else {
-      teamBUpdate.$inc.draws = 1;
+    if (!isDemoRound) {
+      teamBUpdate.$inc.total_score = scoreB;
+      teamBUpdate.$inc.points = teamBPoints;
+
+      if (result === "team_b_win") {
+        teamBUpdate.$inc.wins = 1;
+      } else if (result === "team_a_win") {
+        teamBUpdate.$inc.losses = 1;
+      } else {
+        teamBUpdate.$inc.draws = 1;
+      }
     }
 
     await db

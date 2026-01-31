@@ -247,12 +247,21 @@ export function TournamentParticipantView({
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                             <Swords className="h-5 w-5 text-primary" />
-                            <h3 className="font-display font-bold text-lg">Your Round {myMatch.round_number} Battle</h3>
+                            <h3 className="font-display font-bold text-lg">
+                                Your {myMatch.round_number === 1 ? 'Demo Round' : `Round ${myMatch.round_number}`} Battle
+                            </h3>
                         </div>
-                        <Badge variant={myMatch.status === 'completed' ? 'default' : 'outline'}
-                            className={myMatch.status === 'running' ? 'animate-pulse' : ''}>
-                            {myMatch.status.toUpperCase()}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                            {myMatch.round_number === 1 && (
+                                <Badge variant="secondary" className="bg-primary/20 text-primary border-primary/30">
+                                    DEMO
+                                </Badge>
+                            )}
+                            <Badge variant={myMatch.status === 'completed' ? 'default' : 'outline'}
+                                className={myMatch.status === 'running' ? 'animate-pulse' : ''}>
+                                {myMatch.status.toUpperCase()}
+                            </Badge>
+                        </div>
                     </div>
 
                     <div className="flex flex-col md:flex-row items-center justify-center gap-8 py-4">
@@ -317,8 +326,8 @@ export function TournamentParticipantView({
                                 className="flex flex-col md:flex-row items-center justify-between p-4 rounded-lg border border-border/50 bg-card/30 gap-4"
                             >
                                 <div className="flex items-center gap-4 w-full md:w-auto">
-                                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center font-bold text-muted-foreground shrink-0">
-                                        R{round.round}
+                                    <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold shrink-0 ${round.round === 1 ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                                        {round.round === 1 ? 'D' : `R${round.round}`}
                                     </div>
                                     <div className="flex-1">
                                         <p className="font-semibold flex items-center gap-2">
@@ -328,6 +337,11 @@ export function TournamentParticipantView({
                                 </div>
 
                                 <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                                    {round.round === 1 && (
+                                        <Badge variant="outline" className="text-[10px] uppercase tracking-tighter border-primary/30 text-primary">
+                                            Practice
+                                        </Badge>
+                                    )}
                                     <Badge variant={
                                         round.result === 'win' ? 'default' :
                                             round.result === 'loss' ? 'destructive' : 'secondary'

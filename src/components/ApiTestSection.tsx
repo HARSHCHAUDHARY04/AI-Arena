@@ -47,7 +47,7 @@ export function ApiTestSection() {
         setResponse(null);
 
         const payload = {
-            pdf_url: pdfUrl,
+            pdf_link: pdfUrl,
             questions: questions
         };
 
@@ -83,7 +83,7 @@ export function ApiTestSection() {
     };
 
     const requestPreview = JSON.stringify({
-        pdf_url: pdfUrl,
+        pdf_link: pdfUrl,
         questions: questions
     }, null, 2);
 

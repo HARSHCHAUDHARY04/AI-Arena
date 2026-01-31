@@ -49,7 +49,7 @@ export function EventRulesSection() {
                             <h4 className="font-semibold text-xs mb-2">Input JSON Schema</h4>
                             <pre className="text-xs bg-black/20 p-2 rounded overflow-x-auto">
                                 {`{
-    "pdf_url": "https://example.com/sample.pdf",
+    "pdf_link": "https://example.com/sample.pdf",
     "questions": [
         "What is the summary of section 2?",
         "List all key points..."

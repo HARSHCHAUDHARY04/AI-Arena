@@ -9,7 +9,9 @@ import {
   Clock,
   Loader2,
   Search,
-  Eye
+  Eye,
+  Zap,
+  Activity
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -47,6 +49,8 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
   // State for selected team details
   const [selectedTeamDetails, setSelectedTeamDetails] = useState<TeamDetailsData | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [verifyingAll, setVerifyingAll] = useState(false);
+  const [verificationResults, setVerificationResults] = useState<Record<string, 'online' | 'offline' | 'missing'>>({});
 
   useEffect(() => {
     fetchTeams();
@@ -122,6 +126,32 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
       toast.error('Failed to load team details');
     } finally {
       setLoadingDetails(false);
+    }
+  };
+
+  const handleVerifyAll = async () => {
+    if (!eventId) return;
+    setVerifyingAll(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/verify-all-endpoints`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_id: eventId })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const results: Record<string, 'online' | 'offline' | 'missing'> = {};
+        data.results.forEach((r: any) => {
+          results[r.team_id] = r.status;
+        });
+        setVerificationResults(results);
+        toast.success(`Verified ${data.results.length} teams`);
+      }
+    } catch (err) {
+      console.error('Verification failed:', err);
+      toast.error('Batch verification failed');
+    } finally {
+      setVerifyingAll(false);
     }
   };
 
@@ -202,6 +232,16 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
             <p className="text-sm text-muted-foreground">Update team shortlist status</p>
           </div>
         </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleVerifyAll}
+          disabled={verifyingAll || !eventId}
+          className="flex items-center gap-2"
+        >
+          {verifyingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4 text-warning" />}
+          Verify All APIs
+        </Button>
       </div>
 
       <div className="relative mb-4">
@@ -234,6 +274,16 @@ export function TeamShortlistManager({ eventId }: TeamShortlistManagerProps) {
                     </h4>
                     {team.dataset_name && (
                       <p className="text-xs text-muted-foreground">Dataset: {team.dataset_name}</p>
+                    )}
+                    {verificationResults[team.id] && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <div className={`h-2 w-2 rounded-full ${verificationResults[team.id] === 'online' ? 'bg-success animate-pulse' :
+                          verificationResults[team.id] === 'offline' ? 'bg-destructive' : 'bg-muted-foreground'
+                          }`} />
+                        <span className="text-[10px] uppercase font-bold opacity-70">
+                          {verificationResults[team.id]}
+                        </span>
+                      </div>
                     )}
                   </div>
                   <Dialog>

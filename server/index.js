@@ -1,10 +1,12 @@
 require("dotenv").config();
 const express = require("express");
+const path = require("path");
 const cors = require("cors");
 const { MongoClient, ObjectId } = require("mongodb");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const tournamentService = require("./tournamentService");
+const { getRoundConfig } = require("./Tournamentrounds.constants");
 
 const app = express();
 app.use(
@@ -23,6 +25,12 @@ app.use(
   }),
 );
 app.use(express.json());
+app.use("/pdfs", express.static("pdfs"));
+
+// Serve round 2 PDF at root as per user request
+app.get("/round2.pdf", (req, res) => {
+  res.sendFile(path.join(__dirname, "pdfs", "round2.pdf"));
+});
 
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017";
 const DB_NAME = process.env.DB_NAME || "ai_arena";
@@ -235,8 +243,11 @@ async function testApiEndpoint(endpointUrl, input, timeout = 60000) {
     const timeoutId = setTimeout(() => controller.abort(), timeout);
     const response = await fetch(endpointUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ input }),
+      headers: {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "69420"
+      },
+      body: JSON.stringify(input),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -365,18 +376,31 @@ app.post("/api/evaluate-api", async (req, res) => {
       .json({ error: "team_id, event_id, endpoint_url required" });
   }
   try {
-    const testCases = [
-      { input: "test_data_1", expected_output: "result_1", weight: 1 },
-      { input: "test_data_2", expected_output: "result_2", weight: 1 },
-      { input: "test_data_3", expected_output: "result_3", weight: 1 },
-      { input: "test_data_4", expected_output: "result_4", weight: 1 },
-      { input: "test_data_5", expected_output: "result_5", weight: 1 },
-    ];
+    // Get round configuration (default to Round 1 if not specified)
+    const activeRound = level_id ? parseInt(level_id) : 1;
+    const roundConfig = getRoundConfig(activeRound);
+
+    // Use questions from the round config instead of placeholders
+    const testCases = roundConfig.questions.map((q, idx) => ({
+      input: q,
+      expected_output: roundConfig.groundTruths[idx],
+      weight: 1
+    }));
+
     const testResults = [];
     for (const testCase of testCases) {
-      const result = await testApiEndpoint(endpoint_url, testCase.input);
-      const passed =
-        result.success && result.output === testCase.expected_output;
+      // For the quick/auto eval, we pass the PDF link as part of the context if needed
+      // but the current testApiEndpoint only takes 'input'. 
+      // We'll wrap it to match what the participant dashboard expects.
+      const result = await testApiEndpoint(endpoint_url, {
+        pdf_link: roundConfig.pdfLink,
+        questions: [testCase.input]
+      });
+
+      // Note: result.output might be an array if the team API returns [answer]
+      const actualOutput = Array.isArray(result.output) ? result.output[0] : result.output;
+
+      const passed = result.success && actualOutput === testCase.expected_output;
       testResults.push({
         passed,
         latency: result.latency,
@@ -570,7 +594,10 @@ app.post("/api/proxy-test", async (req, res) => {
 
     const response = await fetch(endpoint_url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "69420"
+      },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
@@ -592,10 +619,22 @@ app.post("/api/proxy-test", async (req, res) => {
       }
     }
 
+    console.log(`Proxy Test: ${endpoint_url} -> Status ${response.status}`);
+
+    let errorMsg = null;
+    if (!response.ok) {
+      if (typeof responseData === 'object' && responseData !== null) {
+        errorMsg = responseData.error || responseData.message || (responseData.detail ? JSON.stringify(responseData.detail) : null);
+      } else if (typeof responseData === 'string') {
+        errorMsg = responseData.slice(0, 200);
+      }
+    }
+
     res.json({
       success: response.ok,
       status: response.status,
       data: responseData,
+      error: errorMsg,
       latency,
     });
   } catch (err) {
@@ -611,12 +650,77 @@ app.post("/api/proxy-test", async (req, res) => {
   }
 });
 
+// [NEW] Batch Verify All Endpoints
+app.post("/api/verify-all-endpoints", async (req, res) => {
+  const { event_id } = req.body;
+  if (!event_id) return res.status(400).json({ error: "event_id required" });
+
+  try {
+    const teams = await db.collection("teams").find({ event_id }).toArray();
+    const results = [];
+
+    // Parallel ping all teams
+    await Promise.all(teams.map(async (team) => {
+      const submission = await db.collection("api_submissions").findOne({
+        team_id: team._id.toString(),
+        event_id: event_id
+      });
+
+      if (!submission || !submission.endpoint_url) {
+        results.push({
+          team_id: team._id.toString(),
+          team_name: team.name,
+          status: 'missing',
+          endpoint: null,
+          latency: 0
+        });
+        return;
+      }
+
+      // Quick ping (no payload processing, just check if reachable)
+      const startTime = Date.now();
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout for bulk check
+
+        const response = await fetch(submission.endpoint_url, {
+          method: "OPTIONS", // Try OPTIONS or a HEAD request first
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+        results.push({
+          team_id: team._id.toString(),
+          team_name: team.name,
+          status: response.ok || response.status === 405 ? 'online' : 'offline', // 405 is fine for OPTIONS
+          endpoint: submission.endpoint_url,
+          latency: Date.now() - startTime
+        });
+      } catch (err) {
+        results.push({
+          team_id: team._id.toString(),
+          team_name: team.name,
+          status: 'offline',
+          endpoint: submission.endpoint_url,
+          error: err.message,
+          latency: Date.now() - startTime
+        });
+      }
+    }));
+
+    res.json({ success: true, results });
+  } catch (err) {
+    console.error("Batch verification failed:", err);
+    res.status(500).json({ error: "Batch verification failed" });
+  }
+});
+
 // [NEW] Dataset Management
 app.post("/api/rounds/:id/dataset", async (req, res) => {
   const { id } = req.params;
-  const { dataset_name, dataset_description, pdf_url, questions } = req.body;
-  if (!pdf_url || !questions)
-    return res.status(400).json({ error: "pdf_url and questions required" });
+  const { dataset_name, dataset_description, pdf_link, questions } = req.body;
+  if (!pdf_link || !questions)
+    return res.status(400).json({ error: "pdf_link and questions required" });
 
   try {
     const round = await db
@@ -632,7 +736,7 @@ app.post("/api/rounds/:id/dataset", async (req, res) => {
         $set: {
           dataset_name,
           dataset_description,
-          dataset_meta: { pdf_url, questions }, // Store securely, not sending back to clients unless authorized
+          dataset_meta: { pdf_link, questions }, // Store securely, not sending back to clients unless authorized
           dataset_locked: true, // Lock immediately as per specific rule "Once uploaded... Locked"
         },
       },
@@ -664,39 +768,17 @@ app.post("/api/rounds/advance", async (req, res) => {
       return;
     }
 
-    // Logic for R1 -> R2
+    // Logic for R1 -> R2 (Demo Round Transition)
     if (from_round_number === 1) {
-      // Top 20 qualify
-      const scores = await db
-        .collection("scores")
-        .find({ event_id }) // Should filter by round_id ideally if multiple scores per event?
-        // Assuming current architecture stores one 'latest' score per team per event in 'scores' or specifically for this round.
-        // For strictness, we should query scores linked to this round. But current schema uses 'scores' with 'event_id'.
-        // We'll sort by 'total_score' descending.
-        .sort({ total_score: -1 })
-        .toArray();
-
-      const top20 = scores.slice(0, 20);
-      const eliminated = scores.slice(20);
-
-      const top20Ids = top20.map((s) => s.team_id);
-      const eliminatedIds = eliminated.map((s) => s.team_id);
-
+      // Demo Round: Everyone qualifies for Round 2
       await db
         .collection("teams")
         .updateMany(
-          { event_id, _id: { $in: top20Ids.map((id) => new ObjectId(id)) } },
-          { $set: { status: "active", qualification: "Round 2 Qualified" } },
+          { event_id },
+          { $set: { status: "active", qualification: "Round 2 Qualified (from Demo)" } },
         );
-      await db.collection("teams").updateMany(
-        {
-          event_id,
-          _id: { $in: eliminatedIds.map((id) => new ObjectId(id)) },
-        },
-        { $set: { status: "eliminated", qualification: "Eliminated R1" } },
-      );
 
-      res.json({ message: "Round 1 Ended. Top 20 qualified for Round 2." });
+      res.json({ message: "Demo Round Ended. All teams advanced to Round 2." });
     }
     // Logic for R2 -> R3 (Winner Bracket)
     else if (from_round_number === 2) {
