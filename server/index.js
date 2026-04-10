@@ -71,10 +71,17 @@ async function ensureSingleEvent() {
 
 async function main() {
   const client = new MongoClient(MONGODB_URI);
-  await client.connect();
-  db = client.db(DB_NAME);
-  console.log("Connected to MongoDB", MONGODB_URI);
-  await ensureSingleEvent();
+  try {
+    await client.connect();
+    db = client.db(DB_NAME);
+    const maskedUri = MONGODB_URI.replace(/:([^:@]+)@/, ":****@");
+    console.log("Connected to MongoDB", maskedUri);
+    await ensureSingleEvent();
+  } catch (err) {
+    const maskedUri = MONGODB_URI.replace(/:([^:@]+)@/, ":****@");
+    console.error(`Failed to connect to MongoDB (${maskedUri}):`, err.message);
+    throw err;
+  }
 }
 
 // Auth Helper
